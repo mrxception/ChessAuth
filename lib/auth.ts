@@ -4,7 +4,6 @@ import { query } from "./db"
 
 const JWT_SECRET = process.env.JWT_SECRET || "chess-auth-secret-key"
 
-// Define an interface for the JWT payload
 interface JwtPayload {
   userId: string
   email: string

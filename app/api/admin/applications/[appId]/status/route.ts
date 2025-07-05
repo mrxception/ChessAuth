@@ -2,7 +2,12 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getUserFromToken } from "@/lib/auth"
 import { query } from "@/lib/db"
 
-export async function PATCH(request: NextRequest, { params }: { params: { appId: string } }) {
+// Define the expected type for the route context
+interface RouteContext {
+  params: { appId: string }
+}
+
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
@@ -26,7 +31,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { appId:
     await query("UPDATE applications SET status = ? WHERE id = ?", [status, appId])
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Update application status error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
