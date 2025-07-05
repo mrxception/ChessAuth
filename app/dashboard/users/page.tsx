@@ -1,6 +1,7 @@
 "use client"
+
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ModernLayout } from "@/components/modern-layout"
 import { ModernCard } from "@/components/modern-card"
@@ -27,6 +28,7 @@ import {
   RotateCcw,
   X,
   Loader2,
+  Users,
 } from "lucide-react"
 
 interface UserInterface {
@@ -41,6 +43,48 @@ interface UserInterface {
   last_login: string | null
 }
 
+interface Application {
+  id: number
+  app_name: string
+  user_id: number
+  public_key: string
+  secret_key: string
+  status: string
+  hwid_lock: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface ApplicationsResponse {
+  applications: Application[]
+}
+
+interface UsersResponse {
+  users: UserInterface[]
+}
+
+interface ApiResponse {
+  success: boolean
+  message?: string
+}
+
+interface FormData {
+  username: string
+  password: string
+  subscription_type: string
+  expires_at: string
+  duration_days: string
+}
+
+interface ExtendData {
+  expires_at: string
+  duration_days: string
+}
+
+interface ActionLoading {
+  [key: string]: boolean
+}
+
 type SortField = "username" | "subscription_type" | "expires_at" | "created_at"
 type SortDirection = "asc" | "desc"
 
@@ -53,34 +97,30 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserInterface | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
-  const [applications, setApplications] = useState<any[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
   const [selectedApp, setSelectedApp] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [sortField, setSortField] = useState<SortField>("created_at")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     username: "",
     password: "",
     subscription_type: "free",
     expires_at: "",
     duration_days: "",
   })
-  const [extendData, setExtendData] = useState({
+  const [extendData, setExtendData] = useState<ExtendData>({
     expires_at: "",
     duration_days: "",
   })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
-  
-  const [actionLoading, setActionLoading] = useState<{
-    [key: string]: boolean
-  }>({})
+  const [actionLoading, setActionLoading] = useState<ActionLoading>({})
   const [createLoading, setCreateLoading] = useState(false)
   const [extendLoading, setExtendLoading] = useState(false)
 
-  
   const [messageBox, setMessageBox] = useState<Omit<MessageBoxProps, "isOpen"> & { isOpen: boolean }>({
     isOpen: false,
     type: "confirm",
@@ -92,10 +132,57 @@ export default function UsersPage() {
 
   const router = useRouter()
 
+  const checkAuth = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+    setLoading(false)
+  }, [router])
+
+  const fetchApplications = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/applications", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data: ApplicationsResponse = await response.json()
+        setApplications(data.applications)
+        if (data.applications.length > 0) {
+          setSelectedApp(data.applications[0].id.toString())
+        }
+      }
+    } catch {
+      console.error("Failed to fetch applications")
+    }
+  }, [])
+
+  const fetchUsers = useCallback(async () => {
+    if (!selectedApp) return
+    setUsersLoading(true)
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch(`/api/applications/${selectedApp}/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data: UsersResponse = await response.json()
+        setUsers(data.users || [])
+      }
+    } catch {
+      console.error("Failed to fetch users")
+      setError("Failed to load users")
+    } finally {
+      setUsersLoading(false)
+    }
+  }, [selectedApp])
+
   useEffect(() => {
     checkAuth()
     fetchApplications()
-  }, [])
+  }, [checkAuth, fetchApplications])
 
   useEffect(() => {
     if (selectedApp) {
@@ -103,9 +190,8 @@ export default function UsersPage() {
     } else {
       setUsers([])
     }
-  }, [selectedApp])
+  }, [selectedApp, fetchUsers])
 
-  
   useEffect(() => {
     if (success || error) {
       const timer = setTimeout(() => {
@@ -138,53 +224,6 @@ export default function UsersPage() {
     return actionLoading[`${userId}-${action}`] || false
   }
 
-  const checkAuth = async () => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
-    }
-    setLoading(false)
-  }
-
-  const fetchApplications = async () => {
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/applications", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setApplications(data.applications)
-        if (data.applications.length > 0) {
-          setSelectedApp(data.applications[0].id.toString())
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch applications:", error)
-    }
-  }
-
-  const fetchUsers = async () => {
-    if (!selectedApp) return
-    setUsersLoading(true)
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch(`/api/applications/${selectedApp}/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data.users || [])
-      }
-    } catch (error) {
-      console.error("Failed to fetch users:", error)
-      setError("Failed to load users")
-    } finally {
-      setUsersLoading(false)
-    }
-  }
-
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
@@ -192,7 +231,7 @@ export default function UsersPage() {
       setSortField(field)
       setSortDirection("asc")
     }
-    setCurrentPage(1) 
+    setCurrentPage(1)
   }
 
   const getSortIcon = (field: SortField) => {
@@ -207,7 +246,6 @@ export default function UsersPage() {
     setSuccess("")
     const token = localStorage.getItem("token")
 
-    
     let expiresAt = null
     if (formData.expires_at) {
       expiresAt = formData.expires_at
@@ -231,8 +269,7 @@ export default function UsersPage() {
           expires_at: expiresAt,
         }),
       })
-
-      const data = await response.json()
+      const data: ApiResponse = await response.json()
       if (data.success) {
         setSuccess("User created successfully!")
         setFormData({
@@ -247,7 +284,7 @@ export default function UsersPage() {
       } else {
         setError(data.message || "Failed to create user")
       }
-    } catch (error) {
+    } catch {
       setError("Network error occurred")
     } finally {
       setCreateLoading(false)
@@ -257,13 +294,11 @@ export default function UsersPage() {
   const extendUser = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedUser) return
-
     setExtendLoading(true)
     setError("")
     setSuccess("")
     const token = localStorage.getItem("token")
 
-    
     let newExpiresAt = null
     if (extendData.expires_at) {
       newExpiresAt = extendData.expires_at
@@ -285,8 +320,7 @@ export default function UsersPage() {
           expires_at: newExpiresAt,
         }),
       })
-
-      const data = await response.json()
+      const data: ApiResponse = await response.json()
       if (data.success) {
         setSuccess(`User ${selectedUser.username} expiration extended successfully!`)
         setExtendData({
@@ -299,7 +333,7 @@ export default function UsersPage() {
       } else {
         setError(data.message || "Failed to extend user")
       }
-    } catch (error) {
+    } catch {
       setError("Network error occurred")
     } finally {
       setExtendLoading(false)
@@ -318,14 +352,13 @@ export default function UsersPage() {
         },
         body: JSON.stringify({ is_banned: !currentBanStatus }),
       })
-
       if (response.ok) {
         fetchUsers()
         setSuccess(`User ${username} ${!currentBanStatus ? "banned" : "unbanned"} successfully!`)
       } else {
         setError("Failed to update user status")
       }
-    } catch (error) {
+    } catch {
       setError("Failed to update user status")
     } finally {
       setUserActionLoading(userId, "ban", false)
@@ -351,15 +384,14 @@ export default function UsersPage() {
             },
             body: JSON.stringify({ reset_hwid: true }),
           })
-
-          const data = await response.json()
+          const data: ApiResponse = await response.json()
           if (data.success) {
             fetchUsers()
             setSuccess(`HWID reset successfully for user "${username}"!`)
           } else {
             setError(data.message || "Failed to reset HWID")
           }
-        } catch (error) {
+        } catch {
           setError("Failed to reset HWID")
         } finally {
           setUserActionLoading(userId, "hwid", false)
@@ -383,14 +415,13 @@ export default function UsersPage() {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
           })
-
           if (response.ok) {
             fetchUsers()
             setSuccess("User deleted successfully!")
           } else {
             setError("Failed to delete user")
           }
-        } catch (error) {
+        } catch {
           setError("Failed to delete user")
         } finally {
           setUserActionLoading(userId, "delete", false)
@@ -419,19 +450,13 @@ export default function UsersPage() {
     return matchesSearch && matchesFilter
   })
 
-  
   const sortedUsers = [...filteredUsers].sort((a, b) => {
-    let aValue: any = a[sortField]
-    let bValue: any = b[sortField]
+    let aValue: string | number = a[sortField] || ""
+    let bValue: string | number = b[sortField] || ""
 
-    
-    if (aValue === null) aValue = ""
-    if (bValue === null) bValue = ""
-
-    
     if (sortField === "expires_at" || sortField === "created_at") {
-      aValue = aValue ? new Date(aValue).getTime() : 0
-      bValue = bValue ? new Date(bValue).getTime() : 0
+      aValue = aValue ? new Date(aValue as string).getTime() : 0
+      bValue = bValue ? new Date(bValue as string).getTime() : 0
     }
 
     if (sortDirection === "asc") {
@@ -441,7 +466,6 @@ export default function UsersPage() {
     }
   })
 
-  
   const totalPages = Math.ceil(sortedUsers.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
@@ -478,7 +502,7 @@ export default function UsersPage() {
       <ModernLayout showBack>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-yellow-500 border-t-transparent mx-auto"></div>
+            <Loader2 className="h-12 w-12 animate-spin text-yellow-500 mx-auto" />
             <p className="text-gray-400">Loading users...</p>
           </div>
         </div>
@@ -493,18 +517,7 @@ export default function UsersPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold gradient-text flex items-center">
-              <svg
-                className="mr-3 h-8 w-8"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="7" r="4" />
-                <path d="M6 21v-2a6 6 0 0 1 12 0v2" />
-              </svg>
+              <Users className="mr-3 h-8 w-8" />
               User Management
             </h1>
             <p className="text-gray-400 mt-1">Manage users and their access permissions</p>
@@ -586,18 +599,7 @@ export default function UsersPage() {
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
                     <div className="relative">
-                      <svg
-                        className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
+                      <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         id="username"
                         value={formData.username}
@@ -992,20 +994,10 @@ export default function UsersPage() {
                     ))}
                   </tbody>
                 </table>
+
                 {currentUsers.length === 0 && !usersLoading && (
                   <div className="text-center py-8">
-                    <svg
-                      className="h-12 w-12 text-gray-600 mx-auto mb-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="7" r="4" />
-                      <path d="M6 21v-2a6 6 0 0 1 12 0v2" />
-                    </svg>
+                    <Users className="h-12 w-12 text-gray-600 mx-auto mb-4" />
                     <p className="text-gray-400">No users found</p>
                     <p className="text-gray-500 text-sm mt-2">
                       {searchTerm || filterStatus !== "all"
@@ -1018,6 +1010,7 @@ export default function UsersPage() {
                 )}
               </div>
             )}
+
             {/* Pagination */}
             {totalPages > 1 && !usersLoading && (
               <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-700">
@@ -1034,7 +1027,6 @@ export default function UsersPage() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-
                   {/* Page numbers */}
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum
@@ -1047,7 +1039,6 @@ export default function UsersPage() {
                     } else {
                       pageNum = currentPage - 2 + i
                     }
-
                     return (
                       <Button
                         key={pageNum}
@@ -1064,7 +1055,6 @@ export default function UsersPage() {
                       </Button>
                     )
                   })}
-
                   <Button
                     variant="outline"
                     size="sm"

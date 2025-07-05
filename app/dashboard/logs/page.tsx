@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ModernLayout } from "@/components/modern-layout"
 import { ModernCard } from "@/components/modern-card"
@@ -30,6 +30,29 @@ interface LogInterface {
   timestamp: string
 }
 
+interface Application {
+  id: number
+  app_name: string
+  user_id: number
+  public_key: string
+  secret_key: string
+  status: string
+  hwid_lock: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface LogsResponse {
+  logs: LogInterface[]
+  totalPages: number
+  total: number
+  actions: string[]
+}
+
+interface ApplicationsResponse {
+  applications: Application[]
+}
+
 type SortField = "username" | "action" | "timestamp"
 type SortDirection = "asc" | "desc"
 
@@ -37,7 +60,7 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<LogInterface[]>([])
   const [loading, setLoading] = useState(true)
   const [logsLoading, setLogsLoading] = useState(false)
-  const [applications, setApplications] = useState<any[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
   const [selectedApp, setSelectedApp] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedAction, setSelectedAction] = useState("")
@@ -53,53 +76,41 @@ export default function LogsPage() {
   const [selectedLog, setSelectedLog] = useState<LogInterface | null>(null)
   const [showLogDetails, setShowLogDetails] = useState(false)
   const [error, setError] = useState("")
+
   const router = useRouter()
 
-  useEffect(() => {
-    checkAuth()
-    fetchApplications()
-  }, [])
-
-  useEffect(() => {
-    if (selectedApp) {
-      fetchLogs()
-    }
-  }, [selectedApp, currentPage, searchTerm, selectedAction, dateFrom, dateTo])
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     const token = localStorage.getItem("token")
     if (!token) {
       router.push("/login")
       return
     }
     setLoading(false)
-  }
+  }, [router])
 
-  const fetchApplications = async () => {
+  const fetchApplications = useCallback(async () => {
     const token = localStorage.getItem("token")
     try {
       const response = await fetch("/api/applications", {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
-        const data = await response.json()
+        const data: ApplicationsResponse = await response.json()
         setApplications(data.applications)
         if (data.applications.length > 0) {
           setSelectedApp(data.applications[0].id.toString())
         }
       }
-    } catch (error) {
-      console.error("Failed to fetch applications:", error)
+    } catch {
+      console.error("Failed to fetch applications")
     }
-  }
+  }, [])
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!selectedApp) return
-
     setLogsLoading(true)
     setError("")
     const token = localStorage.getItem("token")
-
     try {
       const params = new URLSearchParams({
         page: currentPage.toString(),
@@ -113,21 +124,31 @@ export default function LogsPage() {
       const response = await fetch(`/api/applications/${selectedApp}/logs?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-
       if (response.ok) {
-        const data = await response.json()
+        const data: LogsResponse = await response.json()
         setLogs(data.logs || [])
         setTotalPages(data.totalPages || 1)
         setTotalLogs(data.total || 0)
         setAvailableActions(data.actions || [])
       }
-    } catch (error) {
-      console.error("Failed to fetch logs:", error)
+    } catch {
+      console.error("Failed to fetch logs")
       setError("Failed to fetch logs")
     } finally {
       setLogsLoading(false)
     }
-  }
+  }, [selectedApp, currentPage, itemsPerPage, searchTerm, selectedAction, dateFrom, dateTo])
+
+  useEffect(() => {
+    checkAuth()
+    fetchApplications()
+  }, [checkAuth, fetchApplications])
+
+  useEffect(() => {
+    if (selectedApp) {
+      fetchLogs()
+    }
+  }, [selectedApp, fetchLogs])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -180,16 +201,15 @@ export default function LogsPage() {
     )
   }
 
-  
   const sortedLogs = [...logs].sort((a, b) => {
-    let aValue: any = a[sortField]
-    let bValue: any = b[sortField]
-    if (aValue === null) aValue = ""
-    if (bValue === null) bValue = ""
+    let aValue: string | number = a[sortField] || ""
+    let bValue: string | number = b[sortField] || ""
+
     if (sortField === "timestamp") {
-      aValue = new Date(aValue).getTime()
-      bValue = new Date(bValue).getTime()
+      aValue = new Date(aValue as string).getTime()
+      bValue = new Date(bValue as string).getTime()
     }
+
     if (sortDirection === "asc") {
       return aValue > bValue ? 1 : -1
     } else {
@@ -403,7 +423,6 @@ export default function LogsPage() {
                 </thead>
                 <tbody>
                   {logsLoading ? (
-                    
                     <tr>
                       <td colSpan={4} className="text-center py-12">
                         <div className="flex flex-col items-center space-y-4">
@@ -413,7 +432,6 @@ export default function LogsPage() {
                       </td>
                     </tr>
                   ) : sortedLogs.length > 0 ? (
-                    
                     sortedLogs.map((log) => (
                       <tr key={log.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
                         <td className="py-3 px-4 text-gray-300 font-mono text-sm">
@@ -435,7 +453,6 @@ export default function LogsPage() {
                       </tr>
                     ))
                   ) : (
-                    
                     <tr>
                       <td colSpan={4} className="text-center py-8">
                         <Activity className="h-12 w-12 text-gray-600 mx-auto mb-4" />

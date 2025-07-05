@@ -1,6 +1,7 @@
 "use client"
+
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ModernLayout } from "@/components/modern-layout"
 import { ModernCard } from "@/components/modern-card"
@@ -16,7 +17,7 @@ import {
   Crown,
   Shield,
   Key,
-  Users,
+  UsersIcon,
   Activity,
   Eye,
   EyeOff,
@@ -41,16 +42,52 @@ interface Application {
   created_at: string
 }
 
+interface AuthResponse {
+  user: {
+    id: number
+    username: string
+    email: string
+    role: string
+  }
+}
+
+interface ApplicationsResponse {
+  applications: Application[]
+}
+
+interface ApiResponse {
+  success: boolean
+  message?: string
+}
+
+interface PasswordData {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
+interface ShowSecrets {
+  [key: number]: boolean
+}
+
+interface LoadingStates {
+  [key: number]: boolean
+}
+
+interface CopyStatus {
+  [key: string]: boolean
+}
+
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: number; username: string; email: string; role: string } | null>(null)
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [applicationsLoading, setApplicationsLoading] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [newAppName, setNewAppName] = useState("")
-  const [showSecrets, setShowSecrets] = useState<{ [key: number]: boolean }>({})
-  const [passwordData, setPasswordData] = useState({
+  const [showSecrets, setShowSecrets] = useState<ShowSecrets>({})
+  const [passwordData, setPasswordData] = useState<PasswordData>({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -59,21 +96,65 @@ export default function DashboardPage() {
   const [settingsSuccess, setSettingsSuccess] = useState("")
   const [createAppLoading, setCreateAppLoading] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
-  const [hwidToggleLoading, setHwidToggleLoading] = useState<{ [key: number]: boolean }>({})
-  const [copyStatus, setCopyStatus] = useState<{ [key: string]: boolean }>({})
+  const [hwidToggleLoading, setHwidToggleLoading] = useState<LoadingStates>({})
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>({})
+
   const router = useRouter()
+
+  const checkAuth = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data: AuthResponse = await response.json()
+        setUser(data.user)
+        console.log("User data:", data.user)
+      } else {
+        localStorage.removeItem("token")
+        router.push("/login")
+      }
+    } catch {
+      router.push("/login")
+    } finally {
+      setLoading(false)
+    }
+  }, [router])
+
+  const fetchApplications = useCallback(async () => {
+    setApplicationsLoading(true)
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/applications", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data: ApplicationsResponse = await response.json()
+        setApplications(data.applications)
+      }
+    } catch {
+      console.error("Failed to fetch applications")
+    } finally {
+      setApplicationsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     checkAuth()
-  }, [])
+  }, [checkAuth])
 
   useEffect(() => {
     if (user) {
       fetchApplications()
     }
-  }, [user])
+  }, [user, fetchApplications])
 
-  
   useEffect(() => {
     if (settingsSuccess || settingsError) {
       const timer = setTimeout(() => {
@@ -83,49 +164,6 @@ export default function DashboardPage() {
       return () => clearTimeout(timer)
     }
   }, [settingsSuccess, settingsError])
-
-  const checkAuth = async () => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
-    }
-    try {
-      const response = await fetch("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setUser(data.user)
-        console.log("User data:", data.user) 
-      } else {
-        localStorage.removeItem("token")
-        router.push("/login")
-      }
-    } catch (error) {
-      router.push("/login")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchApplications = async () => {
-    setApplicationsLoading(true)
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/applications", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setApplications(data.applications)
-      }
-    } catch (error) {
-      console.error("Failed to fetch applications:", error)
-    } finally {
-      setApplicationsLoading(false)
-    }
-  }
 
   const createApplication = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,8 +183,8 @@ export default function DashboardPage() {
         setShowCreateForm(false)
         fetchApplications()
       }
-    } catch (error) {
-      console.error("Failed to create application:", error)
+    } catch {
+      console.error("Failed to create application")
     } finally {
       setCreateAppLoading(false)
     }
@@ -165,8 +203,8 @@ export default function DashboardPage() {
         body: JSON.stringify({ hwid_lock: !currentState }),
       })
       fetchApplications()
-    } catch (error) {
-      console.error("Failed to update HWID lock:", error)
+    } catch {
+      console.error("Failed to update HWID lock")
     } finally {
       setHwidToggleLoading((prev) => ({ ...prev, [appId]: false }))
     }
@@ -177,16 +215,19 @@ export default function DashboardPage() {
     setPasswordLoading(true)
     setSettingsError("")
     setSettingsSuccess("")
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setSettingsError("New passwords do not match")
       setPasswordLoading(false)
       return
     }
+
     if (passwordData.newPassword.length < 6) {
       setSettingsError("New password must be at least 6 characters long")
       setPasswordLoading(false)
       return
     }
+
     const token = localStorage.getItem("token")
     try {
       const response = await fetch("/api/auth/change-password", {
@@ -200,7 +241,7 @@ export default function DashboardPage() {
           newPassword: passwordData.newPassword,
         }),
       })
-      const data = await response.json()
+      const data: ApiResponse = await response.json()
       if (data.success) {
         setSettingsSuccess("Password changed successfully!")
         setPasswordData({
@@ -211,7 +252,7 @@ export default function DashboardPage() {
       } else {
         setSettingsError(data.message || "Failed to change password")
       }
-    } catch (error) {
+    } catch {
       setSettingsError("Network error occurred")
     } finally {
       setPasswordLoading(false)
@@ -222,7 +263,6 @@ export default function DashboardPage() {
     navigator.clipboard.writeText(text)
     setCopyStatus((prev) => ({ ...prev, [key]: true }))
 
-    
     setTimeout(() => {
       setCopyStatus((prev) => ({ ...prev, [key]: false }))
     }, 3000)
@@ -238,6 +278,13 @@ export default function DashboardPage() {
       ...prev,
       [appId]: !prev[appId],
     }))
+  }
+
+  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const button = e.currentTarget
+    button.innerHTML =
+      '<div class="flex items-center justify-center space-x-2"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading...</span></div>'
+    button.disabled = true
   }
 
   if (loading) {
@@ -273,17 +320,10 @@ export default function DashboardPage() {
           <Link href="/dashboard/users" className="h-full">
             <ModernCard className="cursor-pointer hover-glow h-full">
               <CardContent className="p-6 text-center h-full flex flex-col">
-                <Users className="h-12 w-12 text-blue-400 mx-auto mb-4" />
+                <UsersIcon className="h-12 w-12 text-blue-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">Manage Users</h3>
                 <p className="text-gray-400 mb-4 flex-grow">Create and manage user accounts</p>
-                <Button
-                  className="w-full bg-blue-600 hover:bg-blue-700 mt-auto"
-                  onClick={(e) => {
-                    e.currentTarget.innerHTML =
-                      '<div class="flex items-center justify-center space-x-2"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading...</span></div>'
-                    e.currentTarget.disabled = true
-                  }}
-                >
+                <Button className="w-full bg-blue-600 hover:bg-blue-700 mt-auto" onClick={handleButtonClick}>
                   Go to Users
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -297,14 +337,7 @@ export default function DashboardPage() {
                 <Key className="h-12 w-12 text-green-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">Generate Licenses</h3>
                 <p className="text-gray-400 mb-4 flex-grow">Create and manage license keys</p>
-                <Button
-                  className="w-full bg-green-600 hover:bg-green-700 mt-auto"
-                  onClick={(e) => {
-                    e.currentTarget.innerHTML =
-                      '<div class="flex items-center justify-center space-x-2"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading...</span></div>'
-                    e.currentTarget.disabled = true
-                  }}
-                >
+                <Button className="w-full bg-green-600 hover:bg-green-700 mt-auto" onClick={handleButtonClick}>
                   Go to Licenses
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -318,14 +351,7 @@ export default function DashboardPage() {
                 <Activity className="h-12 w-12 text-orange-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">View Logs</h3>
                 <p className="text-gray-400 mb-4 flex-grow">Monitor system activity and events</p>
-                <Button
-                  className="w-full bg-orange-600 hover:bg-orange-700 mt-auto"
-                  onClick={(e) => {
-                    e.currentTarget.innerHTML =
-                      '<div class="flex items-center justify-center space-x-2"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading...</span></div>'
-                    e.currentTarget.disabled = true
-                  }}
-                >
+                <Button className="w-full bg-orange-600 hover:bg-orange-700 mt-auto" onClick={handleButtonClick}>
                   Go to Logs
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -339,14 +365,7 @@ export default function DashboardPage() {
                 <Settings className="h-12 w-12 text-purple-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">App Settings</h3>
                 <p className="text-gray-400 mb-4 flex-grow">Configure applications and messages</p>
-                <Button
-                  className="w-full bg-purple-600 hover:bg-purple-700 mt-auto"
-                  onClick={(e) => {
-                    e.currentTarget.innerHTML =
-                      '<div class="flex items-center justify-center space-x-2"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading...</span></div>'
-                    e.currentTarget.disabled = true
-                  }}
-                >
+                <Button className="w-full bg-purple-600 hover:bg-purple-700 mt-auto" onClick={handleButtonClick}>
                   Go to Settings
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -516,11 +535,7 @@ export default function DashboardPage() {
                 <Link href="/dashboard/admin" className="flex-1 sm:flex-none">
                   <Button
                     className="w-full min-w-[140px] bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold"
-                    onClick={(e) => {
-                      e.currentTarget.innerHTML =
-                        '<div class="flex items-center justify-center space-x-2"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading...</span></div>'
-                      e.currentTarget.disabled = true
-                    }}
+                    onClick={handleButtonClick}
                   >
                     <Shield className="h-4 w-4 mr-2" />
                     Admin Panel

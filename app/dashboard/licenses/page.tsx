@@ -1,6 +1,7 @@
 "use client"
+
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ModernLayout } from "@/components/modern-layout"
 import { ModernCard } from "@/components/modern-card"
@@ -37,6 +38,30 @@ interface License {
   created_at: string
 }
 
+interface Application {
+  id: number
+  app_name: string
+  user_id: number
+  public_key: string
+  secret_key: string
+  status: string
+  hwid_lock: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface FormData {
+  format: string
+  subscription_type: string
+  expires_at: string
+  duration_days: string
+  quantity: string
+}
+
+interface ActionLoading {
+  [key: string]: boolean
+}
+
 type SortField = "license_key" | "username" | "subscription_type" | "expires_at" | "created_at"
 type SortDirection = "asc" | "desc"
 
@@ -46,13 +71,13 @@ export default function LicensesPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
-  const [applications, setApplications] = useState<any[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
   const [selectedApp, setSelectedApp] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [sortField, setSortField] = useState<SortField>("created_at")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     format: "CHESS-***-***",
     subscription_type: "free",
     expires_at: "",
@@ -61,12 +86,10 @@ export default function LicensesPage() {
   })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-
   const [licensesLoading, setLicensesLoading] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
-  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({})
+  const [actionLoading, setActionLoading] = useState<ActionLoading>({})
 
-  
   const [messageBox, setMessageBox] = useState<Omit<MessageBoxProps, "isOpen"> & { isOpen: boolean }>({
     isOpen: false,
     type: "confirm",
@@ -78,18 +101,66 @@ export default function LicensesPage() {
 
   const router = useRouter()
 
+  const checkAuth = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+    setLoading(false)
+  }, [router])
+
+  const fetchApplications = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/applications", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setApplications(data.applications)
+        if (data.applications.length > 0) {
+          setSelectedApp(data.applications[0].id.toString())
+        }
+      }
+    } catch {
+      console.error("Failed to fetch applications")
+    }
+  }, [])
+
+  const fetchLicenses = useCallback(async () => {
+    if (!selectedApp) return
+    setLicensesLoading(true)
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch(`/api/applications/${selectedApp}/licenses`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setLicenses(data.licenses || [])
+      } else {
+        setError("Failed to load licenses")
+      }
+    } catch {
+      console.error("Failed to fetch licenses")
+      setError("Failed to load licenses")
+    } finally {
+      setLicensesLoading(false)
+    }
+  }, [selectedApp])
+
   useEffect(() => {
     checkAuth()
     fetchApplications()
-  }, [])
+  }, [checkAuth, fetchApplications])
 
   useEffect(() => {
     if (selectedApp) {
       fetchLicenses()
     }
-  }, [selectedApp])
+  }, [selectedApp, fetchLicenses])
 
-  
   useEffect(() => {
     if (success || error) {
       const timer = setTimeout(() => {
@@ -111,55 +182,6 @@ export default function LicensesPage() {
     setMessageBox((prev) => ({ ...prev, isOpen: false }))
   }
 
-  const checkAuth = async () => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
-    }
-    setLoading(false)
-  }
-
-  const fetchApplications = async () => {
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/applications", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setApplications(data.applications)
-        if (data.applications.length > 0) {
-          setSelectedApp(data.applications[0].id.toString())
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch applications:", error)
-    }
-  }
-
-  const fetchLicenses = async () => {
-    if (!selectedApp) return
-    setLicensesLoading(true)
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch(`/api/applications/${selectedApp}/licenses`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setLicenses(data.licenses || [])
-      } else {
-        setError("Failed to load licenses")
-      }
-    } catch (error) {
-      console.error("Failed to fetch licenses:", error)
-      setError("Failed to load licenses")
-    } finally {
-      setLicensesLoading(false)
-    }
-  }
-
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
@@ -167,7 +189,7 @@ export default function LicensesPage() {
       setSortField(field)
       setSortDirection("asc")
     }
-    setCurrentPage(1) 
+    setCurrentPage(1)
   }
 
   const getSortIcon = (field: SortField) => {
@@ -187,7 +209,6 @@ export default function LicensesPage() {
     setSuccess("")
     const token = localStorage.getItem("token")
 
-    
     let expiresAt = null
     if (formData.expires_at) {
       expiresAt = formData.expires_at
@@ -216,7 +237,6 @@ export default function LicensesPage() {
         },
         body: JSON.stringify({ licenses }),
       })
-
       const data = await response.json()
       if (data.success) {
         setSuccess(`${quantity} license${quantity > 1 ? "s" : ""} created successfully!`)
@@ -232,7 +252,7 @@ export default function LicensesPage() {
       } else {
         setError(data.message || "Failed to create licenses")
       }
-    } catch (error) {
+    } catch {
       setError("Network error occurred")
     } finally {
       setCreateLoading(false)
@@ -270,14 +290,13 @@ export default function LicensesPage() {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
           })
-
           if (response.ok) {
             fetchLicenses()
             setSuccess("License deleted successfully!")
           } else {
             setError("Failed to delete license")
           }
-        } catch (error) {
+        } catch {
           setError("Failed to delete license")
         } finally {
           setLicenseActionLoading(licenseId, "delete", false)
@@ -300,19 +319,13 @@ export default function LicensesPage() {
     return matchesSearch && matchesFilter
   })
 
-  
   const sortedLicenses = [...filteredLicenses].sort((a, b) => {
-    let aValue: any = a[sortField]
-    let bValue: any = b[sortField]
+    let aValue: string | number = a[sortField] || ""
+    let bValue: string | number = b[sortField] || ""
 
-    
-    if (aValue === null) aValue = ""
-    if (bValue === null) bValue = ""
-
-    
     if (sortField === "expires_at" || sortField === "created_at") {
-      aValue = aValue ? new Date(aValue).getTime() : 0
-      bValue = bValue ? new Date(bValue).getTime() : 0
+      aValue = aValue ? new Date(aValue as string).getTime() : 0
+      bValue = bValue ? new Date(bValue as string).getTime() : 0
     }
 
     if (sortDirection === "asc") {
@@ -322,7 +335,6 @@ export default function LicensesPage() {
     }
   })
 
-  
   const totalPages = Math.ceil(sortedLicenses.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
@@ -470,6 +482,7 @@ export default function LicensesPage() {
                       Use * for random characters. Example: CHESS-***-*** becomes CHESS-A1B-2C3
                     </p>
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="subscription">Subscription Type</Label>
@@ -503,6 +516,7 @@ export default function LicensesPage() {
                       />
                     </div>
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="expires_at">Expiration Date</Label>
@@ -529,12 +543,14 @@ export default function LicensesPage() {
                       />
                     </div>
                   </div>
+
                   <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                     <p className="text-blue-400 text-sm">
                       💡 <strong>Tip:</strong> You can generate up to 100 licenses at once. Each license will have a
                       unique key based on your format.
                     </p>
                   </div>
+
                   <div className="flex space-x-2">
                     <Button
                       type="submit"
@@ -724,6 +740,7 @@ export default function LicensesPage() {
                     ))}
                   </tbody>
                 </table>
+
                 {currentLicenses.length === 0 && !licensesLoading && (
                   <div className="text-center py-8">
                     <Key className="h-12 w-12 text-gray-600 mx-auto mb-4" />
@@ -739,6 +756,7 @@ export default function LicensesPage() {
                 )}
               </div>
             )}
+
             {/* Pagination */}
             {totalPages > 1 && !licensesLoading && (
               <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-700">
@@ -756,7 +774,6 @@ export default function LicensesPage() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-
                   {/* Page numbers */}
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum
@@ -769,7 +786,6 @@ export default function LicensesPage() {
                     } else {
                       pageNum = currentPage - 2 + i
                     }
-
                     return (
                       <Button
                         key={pageNum}
@@ -786,7 +802,6 @@ export default function LicensesPage() {
                       </Button>
                     )
                   })}
-
                   <Button
                     variant="outline"
                     size="sm"

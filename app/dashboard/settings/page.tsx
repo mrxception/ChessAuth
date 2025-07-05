@@ -1,6 +1,7 @@
 "use client"
+
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ModernLayout } from "@/components/modern-layout"
 import { ModernCard } from "@/components/modern-card"
@@ -32,23 +33,33 @@ interface AppSettings {
   hwid_mismatch_msg: string
 }
 
+interface ApplicationsResponse {
+  applications: Application[]
+}
+
+interface SettingsResponse {
+  settings: AppSettings
+}
+
+interface ApiResponse {
+  success: boolean
+  message?: string
+}
+
 export default function SettingsPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [selectedApp, setSelectedApp] = useState("")
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
-  
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
   const [hwidLoading, setHwidLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  
   const [messageBox, setMessageBox] = useState<Omit<MessageBoxProps, "isOpen"> & { isOpen: boolean }>({
     isOpen: false,
     type: "confirm",
@@ -60,10 +71,60 @@ export default function SettingsPage() {
 
   const router = useRouter()
 
+  const checkAuth = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+    setLoading(false)
+  }, [router])
+
+  const fetchApplications = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/applications", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data: ApplicationsResponse = await response.json()
+        setApplications(data.applications)
+        if (data.applications.length > 0 && !selectedApp) {
+          setSelectedApp(data.applications[0].id.toString())
+        }
+      }
+    } catch {
+      console.error("Failed to fetch applications")
+      setError("Failed to load applications")
+    }
+  }, [selectedApp])
+
+  const fetchAppSettings = useCallback(async () => {
+    if (!selectedApp) return
+    setSettingsLoading(true)
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch(`/api/applications/${selectedApp}/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data: SettingsResponse = await response.json()
+        setAppSettings(data.settings)
+      } else {
+        setError("Failed to load application settings")
+      }
+    } catch {
+      console.error("Failed to fetch app settings")
+      setError("Network error while loading settings")
+    } finally {
+      setSettingsLoading(false)
+    }
+  }, [selectedApp])
+
   useEffect(() => {
     checkAuth()
     fetchApplications()
-  }, [])
+  }, [checkAuth, fetchApplications])
 
   useEffect(() => {
     if (selectedApp) {
@@ -71,9 +132,8 @@ export default function SettingsPage() {
     } else {
       setAppSettings(null)
     }
-  }, [selectedApp])
+  }, [selectedApp, fetchAppSettings])
 
-  
   useEffect(() => {
     if (success || error) {
       const timer = setTimeout(() => {
@@ -95,56 +155,6 @@ export default function SettingsPage() {
     setMessageBox((prev) => ({ ...prev, isOpen: false }))
   }
 
-  const checkAuth = async () => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
-    }
-    setLoading(false)
-  }
-
-  const fetchApplications = async () => {
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/applications", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setApplications(data.applications)
-        if (data.applications.length > 0 && !selectedApp) {
-          setSelectedApp(data.applications[0].id.toString())
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch applications:", error)
-      setError("Failed to load applications")
-    }
-  }
-
-  const fetchAppSettings = async () => {
-    if (!selectedApp) return
-    setSettingsLoading(true)
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch(`/api/applications/${selectedApp}/settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setAppSettings(data.settings)
-      } else {
-        setError("Failed to load application settings")
-      }
-    } catch (error) {
-      console.error("Failed to fetch app settings:", error)
-      setError("Network error while loading settings")
-    } finally {
-      setSettingsLoading(false)
-    }
-  }
-
   const updateAppStatus = async (status: string) => {
     setStatusLoading(true)
     const token = localStorage.getItem("token")
@@ -163,7 +173,7 @@ export default function SettingsPage() {
       } else {
         setError("Failed to update application status")
       }
-    } catch (error) {
+    } catch {
       setError("Failed to update application status")
     } finally {
       setStatusLoading(false)
@@ -188,7 +198,7 @@ export default function SettingsPage() {
       } else {
         setError("Failed to update HWID lock")
       }
-    } catch (error) {
+    } catch {
       setError("Failed to update HWID lock")
     } finally {
       setHwidLoading(false)
@@ -198,12 +208,10 @@ export default function SettingsPage() {
   const saveMessages = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!appSettings) return
-
     setPasswordLoading(true)
     setError("")
     setSuccess("")
     const token = localStorage.getItem("token")
-
     try {
       const response = await fetch(`/api/applications/${selectedApp}/settings`, {
         method: "PATCH",
@@ -219,13 +227,12 @@ export default function SettingsPage() {
           hwid_mismatch_msg: appSettings.hwid_mismatch_msg,
         }),
       })
-
       if (response.ok) {
         setSuccess("Messages updated successfully!")
       } else {
         setError("Failed to update messages")
       }
-    } catch (error) {
+    } catch {
       setError("Network error occurred")
     } finally {
       setPasswordLoading(false)
@@ -235,7 +242,6 @@ export default function SettingsPage() {
   const confirmDeleteApplication = () => {
     const selectedApplication = applications.find((app) => app.id.toString() === selectedApp)
     if (!selectedApplication) return
-
     showMessageBox({
       type: "confirm",
       title: "Delete Application",
@@ -254,19 +260,17 @@ export default function SettingsPage() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-
-      const data = await response.json()
+      const data: ApiResponse = await response.json()
       if (response.ok && data.success) {
         setSuccess("Application deleted successfully!")
-        
         setSelectedApp("")
         setAppSettings(null)
         fetchApplications()
       } else {
         setError(data.message || "Failed to delete application")
       }
-    } catch (error) {
-      console.error("Delete error:", error)
+    } catch {
+      console.error("Delete error")
       setError("Network error occurred while deleting application")
     } finally {
       setDeleteLoading(false)
