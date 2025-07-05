@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserFromToken, User } from "@/lib/auth"
 import { query } from "@/lib/db"
 
-export async function PATCH(request: NextRequest, { params }: any) {
+// ✅ Use this helper type for the context
+interface Context {
+  params: {
+    appId: string
+  }
+}
+
+export async function PATCH(request: NextRequest, context: Context): Promise<NextResponse> {
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
@@ -17,7 +24,7 @@ export async function PATCH(request: NextRequest, { params }: any) {
     }
 
     const { status } = await request.json()
-    const appId = params.appId
+    const appId = context.params.appId
 
     if (!["active", "suspended"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
@@ -26,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: any) {
     await query("UPDATE applications SET status = ? WHERE id = ?", [status, appId])
 
     return NextResponse.json({ success: true })
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Update application status error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
