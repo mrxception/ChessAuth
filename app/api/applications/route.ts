@@ -2,6 +2,25 @@ import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getUserFromToken, generateKey } from "@/lib/auth"
 
+interface Application {
+  id: number
+  user_id: number
+  app_name: string
+  public_key: string
+  secret_key: string
+  created_at: string
+  updated_at: string
+}
+
+interface InsertResult {
+  insertId: number
+  affectedRows: number
+}
+
+interface CreateApplicationRequest {
+  app_name: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization")
@@ -12,13 +31,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    const applications = await query("SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC", [user.id])
+    const applications = (await query("SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC", [
+      user.id,
+    ])) as Application[]
 
     return NextResponse.json({
       success: true,
       applications,
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Fetch applications error:", error)
     return NextResponse.json(
       {
@@ -40,7 +61,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    const { app_name } = await request.json()
+    const body = (await request.json()) as CreateApplicationRequest
+    const { app_name } = body
 
     if (!app_name) {
       return NextResponse.json(
@@ -58,7 +80,7 @@ export async function POST(request: NextRequest) {
     const result = (await query(
       "INSERT INTO applications (user_id, app_name, public_key, secret_key) VALUES (?, ?, ?, ?)",
       [user.id, app_name, publicKey, secretKey],
-    )) as any
+    )) as InsertResult
 
     await query("INSERT INTO app_settings (application_id) VALUES (?)", [result.insertId])
 
@@ -66,7 +88,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "Application created successfully",
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Create application error:", error)
     return NextResponse.json(
       {
