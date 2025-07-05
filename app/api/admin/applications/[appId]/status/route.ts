@@ -1,14 +1,8 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getUserFromToken, User } from "@/lib/auth"
+import { type NextRequest, NextResponse } from "next/server"
+import { getUserFromToken } from "@/lib/auth"
 import { query } from "@/lib/db"
 
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ userId: string }> }
-) {
-  // Await the params since they're now a Promise
-  const { userId } = await context.params
-
+export async function PATCH(request: NextRequest, { params }: { params: { appId: string } }) {
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
@@ -16,23 +10,24 @@ export async function PATCH(
     }
 
     const token = authHeader.substring(7)
-    const user: User | null = await getUserFromToken(token)
+    const user = await getUserFromToken(token)
 
     if (!user || user.role !== "admin") {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
 
-    const { role } = await request.json()
+    const { status } = await request.json()
+    const appId = params.appId
 
-    if (!["admin", "user"].includes(role)) {
-      return NextResponse.json({ error: "Invalid role" }, { status: 400 })
+    if (!["active", "suspended"].includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
-    await query("UPDATE users SET role = ? WHERE id = ?", [role, userId])
+    await query("UPDATE applications SET status = ? WHERE id = ?", [status, appId])
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Update user role error:", error)
+    console.error("Update application status error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
