@@ -4,10 +4,10 @@ import { query } from "@/lib/db"
 
 export async function PATCH(
   request: NextRequest,
-  context: { params: Promise<{ appId: string }> }
+  context: { params: Promise<{ userId: string }> }
 ) {
   // Await the params since they're now a Promise
-  const { appId } = await context.params
+  const { userId } = await context.params
 
   try {
     const authHeader = request.headers.get("authorization")
@@ -22,17 +22,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
 
-    const { status } = await request.json()
+    const { role } = await request.json()
 
-    if (!["active", "suspended"].includes(status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+    if (!["admin", "user"].includes(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 
-    await query("UPDATE applications SET status = ? WHERE id = ?", [status, appId])
+    await query("UPDATE users SET role = ? WHERE id = ?", [role, userId])
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Update application status error:", error)
+    console.error("Update user role error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
