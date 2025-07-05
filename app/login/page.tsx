@@ -138,7 +138,7 @@ export default function LoginPage() {
               <div className="space-y-4 pt-4 border-t border-gray-700">
                 <div className="text-center">
                   <Link href="/register" className="text-yellow-500 hover:text-yellow-400 font-medium">
-                    Don't have an account? Create one
+                    Don&apos;t have an account? Create one
                   </Link>
                 </div>
               </div>
