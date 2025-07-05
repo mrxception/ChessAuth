@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserFromToken, User } from "@/lib/auth"
 import { query } from "@/lib/db"
 
-// ✅ Inline typing directly inside the function signature — this is required.
 export async function PATCH(
   request: NextRequest,
-  context: { readonly params: { readonly appId: string } }
+  context: { params: Promise<{ appId: string }> }
 ) {
-  const { appId } = context.params
+  // Await the params since they're now a Promise
+  const { appId } = await context.params
 
   try {
     const authHeader = request.headers.get("authorization")
