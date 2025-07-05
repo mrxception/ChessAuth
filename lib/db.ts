@@ -7,7 +7,7 @@ export const db = await mysql.createConnection({
   database: 'sql12788046',
 })
 
-export async function query(sql: string, params: any[] = []) {
+export async function query(sql: string, params: unknown[] = []) {
   try {
     const [results] = await db.execute(sql, params)
     return results

@@ -4,6 +4,13 @@ import { query } from "./db"
 
 const JWT_SECRET = process.env.JWT_SECRET || "chess-auth-secret-key"
 
+// Define an interface for the JWT payload
+interface JwtPayload {
+  userId: string
+  email: string
+  role?: string
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12)
 }
@@ -12,15 +19,14 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
-export function generateToken(payload: any): string {
-  
+export function generateToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" })
 }
 
-export function verifyToken(token: string): any {
+export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET)
-  } catch (error) {
+    return jwt.verify(token, JWT_SECRET) as JwtPayload
+  } catch (_error) {
     return null
   }
 }
@@ -38,7 +44,6 @@ export async function getUserFromToken(token: string) {
   const decoded = verifyToken(token)
   if (!decoded) return null
 
-  
   const users = await query("SELECT id, email, username, role FROM users WHERE id = ?", [decoded.userId])
   return Array.isArray(users) && users.length > 0 ? users[0] : null
 }

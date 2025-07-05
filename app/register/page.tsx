@@ -58,7 +58,7 @@ export default function RegisterPage() {
         setError(data.message || "Registration failed")
       }
     } catch (err) {
-      setError("Network error occurred")
+      setError(`Network error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setLoading(false)
     }

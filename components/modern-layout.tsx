@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { LogOut, Crown, Shield, Zap, ArrowLeft, Settings } from 'lucide-react'
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import Link from "next/link"
 
 interface ModernLayoutProps {
   children: ReactNode
