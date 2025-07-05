@@ -384,20 +384,10 @@ const features = [
   },
 ]
 
-const stats = [
-  { label: "API Calls", value: "10M+", icon: Activity },
-  { label: "Developers", value: "5K+", icon: Users },
-  { label: "Uptime", value: "99.9%", icon: Server },
-  { label: "Countries", value: "50+", icon: Globe },
-]
-
-
-
 function SyntaxHighlighter({ code, language }: { code: string; language: string }) {
   const lines = code.split("\n")
 
   const getTokenColor = (token: string, lang: string): string => {
-    
     const keywords = {
       javascript: [
         "const",
@@ -447,7 +437,6 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
       return "text-purple-400"
     }
 
-    
     if (
       (token.startsWith('"') && token.endsWith('"')) ||
       (token.startsWith("'") && token.endsWith("'")) ||
@@ -456,17 +445,14 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
       return "text-green-300"
     }
 
-    
     if (/^\d+\.?\d*$/.test(token)) {
       return "text-orange-400"
     }
 
-    
     if (token.startsWith("//") || token.startsWith("#")) {
       return "text-gray-500"
     }
 
-    
     if (lang === "json" && token.startsWith('"') && token.endsWith('":')) {
       return "text-blue-300"
     }
@@ -475,7 +461,6 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
   }
 
   const tokenizeLine = (line: string, lang: string) => {
-    
     const tokens = line.split(/(\s+|[{}()[\],.;:=<>!&|+\-*/])/).filter((token) => token.length > 0)
 
     return tokens.map((token, index) => {
@@ -492,7 +477,7 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
     <pre className="font-mono text-sm leading-6 whitespace-pre overflow-x-auto">
       <code>
         {lines.map((line, index) => (
-          <div key={index}>{line.trim() === "" ? "\u00A0" : tokenizeLine(line, language)}</div>
+          <div key={index}>{line.trim() === "" ? "\u Grownu00A0" : tokenizeLine(line, language)}</div>
         ))}
       </code>
     </pre>
