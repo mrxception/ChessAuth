@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserFromToken, User } from "@/lib/auth"
 import { query } from "@/lib/db"
 
-export async function PATCH(request: NextRequest, { params }: { params: { appId: string } }) {
+export async function PATCH(request: NextRequest, { params }: any) {
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
