@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ModernLayout } from "@/components/modern-layout"
 import { ModernCard } from "@/components/modern-card"
@@ -92,6 +94,23 @@ interface AdminLog {
   app_owner: string | null
 }
 
+interface LoadingStates {
+  stats: boolean
+  users: boolean
+  applications: boolean
+  licenses: boolean
+  logs: boolean
+}
+
+interface ActionLoading {
+  [key: string]: boolean
+}
+
+interface EmptyStateProps {
+  message: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
 export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -103,10 +122,9 @@ export default function AdminPanel() {
   const [searchTerm, setSearchTerm] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({})
+  const [actionLoading, setActionLoading] = useState<ActionLoading>({})
 
-  
-  const [loadingStates, setLoadingStates] = useState({
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
     stats: false,
     users: false,
     applications: false,
@@ -114,7 +132,6 @@ export default function AdminPanel() {
     logs: false,
   })
 
-  
   const [messageBox, setMessageBox] = useState<Omit<MessageBoxProps, "isOpen"> & { isOpen: boolean }>({
     isOpen: false,
     type: "confirm",
@@ -126,9 +143,127 @@ export default function AdminPanel() {
 
   const router = useRouter()
 
+  const checkAdminAuth = useCallback(async () => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.user.role !== "admin") {
+          router.push("/dashboard")
+          return
+        }
+      } else {
+        router.push("/login")
+        return
+      }
+    } catch {
+      router.push("/login")
+      return
+    }
+    setLoading(false)
+  }, [router])
+
+  const fetchStats = useCallback(async () => {
+    setLoadingStates((prev) => ({ ...prev, stats: true }))
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/admin/stats", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setStats(data.stats)
+      }
+    } catch {
+      setError("Failed to load statistics")
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, stats: false }))
+    }
+  }, [])
+
+  const fetchUsers = useCallback(async () => {
+    setLoadingStates((prev) => ({ ...prev, users: true }))
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/admin/users", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data.users)
+      }
+    } catch {
+      setError("Failed to load users")
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, users: false }))
+    }
+  }, [])
+
+  const fetchApplications = useCallback(async () => {
+    setLoadingStates((prev) => ({ ...prev, applications: true }))
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/admin/applications", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setApplications(data.applications)
+      }
+    } catch {
+      setError("Failed to load applications")
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, applications: false }))
+    }
+  }, [])
+
+  const fetchLicenses = useCallback(async () => {
+    setLoadingStates((prev) => ({ ...prev, licenses: true }))
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/admin/licenses", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setLicenses(data.licenses)
+      }
+    } catch {
+      setError("Failed to load licenses")
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, licenses: false }))
+    }
+  }, [])
+
+  const fetchLogs = useCallback(async () => {
+    setLoadingStates((prev) => ({ ...prev, logs: true }))
+    const token = localStorage.getItem("token")
+    try {
+      const response = await fetch("/api/admin/logs", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setLogs(data.logs)
+      }
+    } catch {
+      setError("Failed to load logs")
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, logs: false }))
+    }
+  }, [])
+
   useEffect(() => {
     checkAdminAuth()
-  }, [])
+  }, [checkAdminAuth])
 
   useEffect(() => {
     if (activeTab === "overview") {
@@ -142,9 +277,8 @@ export default function AdminPanel() {
     } else if (activeTab === "logs") {
       fetchLogs()
     }
-  }, [activeTab])
+  }, [activeTab, fetchStats, fetchUsers, fetchApplications, fetchLicenses, fetchLogs])
 
-  
   useEffect(() => {
     if (success || error) {
       const timer = setTimeout(() => {
@@ -164,126 +298,6 @@ export default function AdminPanel() {
 
   const hideMessageBox = () => {
     setMessageBox((prev) => ({ ...prev, isOpen: false }))
-  }
-
-  const checkAdminAuth = async () => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const response = await fetch("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.user.role !== "admin") {
-          router.push("/dashboard")
-          return
-        }
-      } else {
-        router.push("/login")
-        return
-      }
-    } catch (error) {
-      router.push("/login")
-      return
-    }
-
-    setLoading(false)
-  }
-
-  const fetchStats = async () => {
-    setLoadingStates((prev) => ({ ...prev, stats: true }))
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/admin/stats", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setStats(data.stats)
-      }
-    } catch (error) {
-      setError("Failed to load statistics")
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, stats: false }))
-    }
-  }
-
-  const fetchUsers = async () => {
-    setLoadingStates((prev) => ({ ...prev, users: true }))
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/admin/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data.users)
-      }
-    } catch (error) {
-      setError("Failed to load users")
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, users: false }))
-    }
-  }
-
-  const fetchApplications = async () => {
-    setLoadingStates((prev) => ({ ...prev, applications: true }))
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/admin/applications", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setApplications(data.applications)
-      }
-    } catch (error) {
-      setError("Failed to load applications")
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, applications: false }))
-    }
-  }
-
-  const fetchLicenses = async () => {
-    setLoadingStates((prev) => ({ ...prev, licenses: true }))
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/admin/licenses", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setLicenses(data.licenses)
-      }
-    } catch (error) {
-      setError("Failed to load licenses")
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, licenses: false }))
-    }
-  }
-
-  const fetchLogs = async () => {
-    setLoadingStates((prev) => ({ ...prev, logs: true }))
-    const token = localStorage.getItem("token")
-    try {
-      const response = await fetch("/api/admin/logs", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setLogs(data.logs)
-      }
-    } catch (error) {
-      setError("Failed to load logs")
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, logs: false }))
-    }
   }
 
   const toggleUserRole = async (userId: number, currentRole: string, username: string) => {
@@ -312,7 +326,7 @@ export default function AdminPanel() {
           } else {
             setError("Failed to change user role")
           }
-        } catch (error) {
+        } catch {
           setError("Failed to change user role")
         } finally {
           setActionLoading((prev) => ({ ...prev, [`user-${userId}`]: false }))
@@ -347,7 +361,7 @@ export default function AdminPanel() {
           } else {
             setError("Failed to update application status")
           }
-        } catch (error) {
+        } catch {
           setError("Failed to update application status")
         } finally {
           setActionLoading((prev) => ({ ...prev, [`app-${appId}`]: false }))
@@ -377,7 +391,7 @@ export default function AdminPanel() {
           } else {
             setError("Failed to delete user")
           }
-        } catch (error) {
+        } catch {
           setError("Failed to delete user")
         } finally {
           setActionLoading((prev) => ({ ...prev, [`delete-user-${userId}`]: false }))
@@ -386,7 +400,6 @@ export default function AdminPanel() {
     })
   }
 
-  
   const filteredUsers = users
     .filter(
       (user) =>
@@ -421,7 +434,6 @@ export default function AdminPanel() {
     )
     .slice(0, 10)
 
-  
   const TableLoading = () => (
     <div className="flex items-center justify-center py-12">
       <div className="text-center space-y-4">
@@ -431,8 +443,7 @@ export default function AdminPanel() {
     </div>
   )
 
-  
-  const EmptyState = ({ message, icon: Icon }: { message: string; icon: any }) => (
+  const EmptyState = ({ message, icon: Icon }: EmptyStateProps) => (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <Icon className="h-12 w-12 text-gray-500 mb-4" />
       <p className="text-gray-400 text-lg font-medium">{message}</p>

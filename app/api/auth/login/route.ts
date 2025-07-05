@@ -2,9 +2,23 @@ import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { verifyPassword, generateToken } from "@/lib/auth"
 
+// Define interfaces for type safety
+interface LoginRequest {
+  username: string
+  password: string
+}
+
+interface UserData {
+  id: number
+  username: string
+  email: string
+  password_hash: string
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json()
+    const body = (await request.json()) as LoginRequest
+    const { username, password } = body
 
     if (!username || !password) {
       return NextResponse.json(
@@ -16,11 +30,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
-    const users = await query("SELECT id, username, email, password_hash FROM users WHERE username = ? OR email = ?", [
+    const users = (await query("SELECT id, username, email, password_hash FROM users WHERE username = ? OR email = ?", [
       username,
       username,
-    ])
+    ])) as UserData[]
 
     if (!Array.isArray(users) || users.length === 0) {
       return NextResponse.json(
@@ -32,11 +45,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = users[0] as any
+    const user = users[0]
 
-    
     const isValidPassword = await verifyPassword(password, user.password_hash)
-
     if (!isValidPassword) {
       return NextResponse.json(
         {
@@ -47,8 +58,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
-    const token = generateToken({ userId: user.id, username: user.username })
+    const token = generateToken({ userId: user.id, username: user.username, role: "user" })
 
     return NextResponse.json({
       success: true,
@@ -60,7 +70,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
       },
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Login error:", error)
     return NextResponse.json(
       {

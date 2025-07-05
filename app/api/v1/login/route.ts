@@ -2,6 +2,47 @@ import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import bcrypt from "bcryptjs"
 
+// Define interfaces for type safety
+interface LoginRequest {
+  public_key: string
+  secret_key: string
+  username: string
+  password: string
+  hwid?: string
+}
+
+interface Application {
+  id: number
+  hwid_lock: boolean
+}
+
+interface AppSettings {
+  application_id: number
+  login_success_msg?: string
+  login_error_msg?: string
+  sub_expired_msg?: string
+  banned_msg?: string
+  hwid_mismatch_msg?: string
+}
+
+interface License {
+  id: number
+  username: string
+  password_hash: string
+  is_banned: boolean
+  expires_at: string | null
+  hwid: string | null
+  subscription_type: string
+}
+
+interface Messages {
+  login_success: string
+  login_error: string
+  sub_expired: string
+  banned: string
+  hwid_mismatch: string
+}
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -16,13 +57,13 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { public_key, secret_key, username, password, hwid } = await request.json()
+    const body = (await request.json()) as LoginRequest
+    const { public_key, secret_key, username, password, hwid } = body
 
-    
-    const apps = await query(
+    const apps = (await query(
       'SELECT id, hwid_lock FROM applications WHERE public_key = ? AND secret_key = ? AND status = "active"',
       [public_key, secret_key],
-    )
+    )) as Application[]
 
     if (!Array.isArray(apps) || apps.length === 0) {
       return NextResponse.json(
@@ -34,21 +75,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const app = apps[0] as any
+    const app = apps[0]
 
-    
-    let settings = await query("SELECT * FROM app_settings WHERE application_id = ?", [app.id])
+    let settings = (await query("SELECT * FROM app_settings WHERE application_id = ?", [app.id])) as AppSettings[]
 
-    
     if (!Array.isArray(settings) || settings.length === 0) {
       await query("INSERT INTO app_settings (application_id) VALUES (?)", [app.id])
-      settings = await query("SELECT * FROM app_settings WHERE application_id = ?", [app.id])
+      settings = (await query("SELECT * FROM app_settings WHERE application_id = ?", [app.id])) as AppSettings[]
     }
 
     const appSettings = Array.isArray(settings) && settings.length > 0 ? settings[0] : null
 
-    
-    const messages = {
+    const messages: Messages = {
       login_success: appSettings?.login_success_msg || "Login successful",
       login_error: appSettings?.login_error_msg || "Invalid credentials",
       sub_expired: appSettings?.sub_expired_msg || "Subscription expired",
@@ -56,8 +94,10 @@ export async function POST(request: NextRequest) {
       hwid_mismatch: appSettings?.hwid_mismatch_msg || "HWID mismatch",
     }
 
-    
-    const licenses = await query("SELECT * FROM licenses WHERE application_id = ? AND username = ?", [app.id, username])
+    const licenses = (await query("SELECT * FROM licenses WHERE application_id = ? AND username = ?", [
+      app.id,
+      username,
+    ])) as License[]
 
     if (!Array.isArray(licenses) || licenses.length === 0) {
       return NextResponse.json(
@@ -69,9 +109,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const license = licenses[0] as any
+    const license = licenses[0]
 
-    
     if (license.is_banned) {
       return NextResponse.json(
         {
@@ -82,7 +121,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
     if (!license.password_hash || !password) {
       return NextResponse.json(
         {
@@ -104,7 +142,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
     if (license.expires_at && new Date(license.expires_at) < new Date()) {
       return NextResponse.json(
         {
@@ -115,7 +152,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
     if (app.hwid_lock) {
       if (!hwid) {
         return NextResponse.json(
@@ -126,7 +162,6 @@ export async function POST(request: NextRequest) {
           { status: 400, headers: corsHeaders() },
         )
       }
-
       if (license.hwid && license.hwid !== hwid) {
         return NextResponse.json(
           {
@@ -137,13 +172,11 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      
       if (!license.hwid) {
         await query("UPDATE licenses SET hwid = ? WHERE id = ?", [hwid, license.id])
       }
     }
 
-    
     await query("INSERT INTO logs (application_id, username, action, ip_address) VALUES (?, ?, ?, ?)", [
       app.id,
       username,
@@ -163,7 +196,7 @@ export async function POST(request: NextRequest) {
       },
       { headers: corsHeaders() },
     )
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API Login error:", error)
     return NextResponse.json(
       {

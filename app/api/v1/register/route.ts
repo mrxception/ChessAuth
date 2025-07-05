@@ -2,11 +2,41 @@ import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import bcrypt from "bcryptjs"
 
+// Define interfaces for type safety
+interface RegisterRequest {
+  public_key: string
+  secret_key: string
+  username: string
+  password: string
+  license_key: string
+  hwid?: string
+}
+
+interface Application {
+  id: number
+  hwid_lock: boolean
+}
+
+interface License {
+  id: number
+  username: string | null
+  password_hash: string | null
+  license_key: string
+  expires_at: string | null
+  subscription_type: string
+  is_banned: boolean
+  hwid: string | null
+}
+
+interface ExistingUser {
+  id: number
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { public_key, secret_key, username, password, license_key, hwid } = await request.json()
+    const body = (await request.json()) as RegisterRequest
+    const { public_key, secret_key, username, password, license_key, hwid } = body
 
-    
     if (!username || !password || !license_key) {
       return NextResponse.json(
         {
@@ -17,11 +47,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
-    const apps = await query(
+    const apps = (await query(
       'SELECT id, hwid_lock FROM applications WHERE public_key = ? AND secret_key = ? AND status = "active"',
       [public_key, secret_key],
-    )
+    )) as Application[]
 
     if (!Array.isArray(apps) || apps.length === 0) {
       return NextResponse.json(
@@ -33,13 +62,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const app = apps[0] as any
+    const app = apps[0]
 
-    
-    const licenses = await query(
+    const licenses = (await query(
       "SELECT * FROM licenses WHERE application_id = ? AND license_key = ? AND is_banned = FALSE",
       [app.id, license_key],
-    )
+    )) as License[]
 
     if (!Array.isArray(licenses) || licenses.length === 0) {
       return NextResponse.json(
@@ -51,9 +79,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const license = licenses[0] as any
+    const license = licenses[0]
 
-    
     if (license.username) {
       return NextResponse.json(
         {
@@ -64,7 +91,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
     if (license.expires_at && new Date(license.expires_at) < new Date()) {
       return NextResponse.json(
         {
@@ -75,11 +101,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
-    const existingUsers = await query(
-      "SELECT id FROM licenses WHERE application_id = ? AND username = ?",
-      [app.id, username],
-    )
+    const existingUsers = (await query("SELECT id FROM licenses WHERE application_id = ? AND username = ?", [
+      app.id,
+      username,
+    ])) as ExistingUser[]
 
     if (Array.isArray(existingUsers) && existingUsers.length > 0) {
       return NextResponse.json(
@@ -91,7 +116,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
     if (app.hwid_lock && !hwid) {
       return NextResponse.json(
         {
@@ -102,22 +126,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    
     const saltRounds = 12
     const password_hash = await bcrypt.hash(password, saltRounds)
 
-    
-    const updateData = [username, password_hash, app.hwid_lock ? hwid : null, license.id]
-    await query(
-      "UPDATE licenses SET username = ?, password_hash = ?, hwid = ? WHERE id = ?",
-      updateData,
-    )
+    const updateData: (string | null | number)[] = [username, password_hash, app.hwid_lock ? hwid : null, license.id]
+    await query("UPDATE licenses SET username = ?, password_hash = ?, hwid = ? WHERE id = ?", updateData)
 
-    
-    await query(
-      "INSERT INTO logs (application_id, username, action, ip_address) VALUES (?, ?, ?, ?)",
-      [app.id, username, "register", request.ip || "unknown"],
-    )
+    await query("INSERT INTO logs (application_id, username, action, ip_address) VALUES (?, ?, ?, ?)", [
+      app.id,
+      username,
+      "register",
+      request.ip || "unknown",
+    ])
 
     return NextResponse.json({
       success: true,
@@ -128,7 +148,7 @@ export async function POST(request: NextRequest) {
         expires_at: license.expires_at,
       },
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API Register error:", error)
     return NextResponse.json(
       {
