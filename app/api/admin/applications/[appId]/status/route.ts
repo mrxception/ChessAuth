@@ -1,5 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getUserFromToken } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { getUserFromToken, User } from "@/lib/auth"
 import { query } from "@/lib/db"
 
 export async function PATCH(request: NextRequest, context: { params: { appId: string } }) {
@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest, context: { params: { appId: st
     }
 
     const token = authHeader.substring(7)
-    const user = await getUserFromToken(token)
+    const user: User | null = await getUserFromToken(token)
 
     if (!user || user.role !== "admin") {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
