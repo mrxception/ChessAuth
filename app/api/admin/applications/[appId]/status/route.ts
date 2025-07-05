@@ -1,13 +1,8 @@
-import type { NextRequest } from "next/server"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { getUserFromToken, User } from "@/lib/auth"
+import { query } from "@/lib/db"
 
-type Params = {
-  params: {
-    appId: string
-  }
-}
-
-export async function PATCH(request: NextRequest, { params }: Params) {
+export async function PATCH(request: NextRequest, { params }: { params: { appId: string } }) {
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
