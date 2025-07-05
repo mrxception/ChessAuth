@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserFromToken, User } from "@/lib/auth"
 import { query } from "@/lib/db"
 
+// ✅ Inline typing directly inside the function signature — this is required.
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { appId: string } }
-): Promise<NextResponse> {
+  context: { readonly params: { readonly appId: string } }
+) {
+  const { appId } = context.params
+
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
@@ -20,7 +23,6 @@ export async function PATCH(
     }
 
     const { status } = await request.json()
-    const appId = params.appId
 
     if (!["active", "suspended"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
