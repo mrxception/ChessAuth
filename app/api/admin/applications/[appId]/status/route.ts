@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getUserFromToken, User } from "@/lib/auth"
-import { query } from "@/lib/db"
+import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 
-export async function PATCH(request: NextRequest, context: { params: { appId: string } }) {
+type Params = {
+  params: {
+    appId: string
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
@@ -17,7 +22,7 @@ export async function PATCH(request: NextRequest, context: { params: { appId: st
     }
 
     const { status } = await request.json()
-    const appId = context.params.appId
+    const appId = params.appId
 
     if (!["active", "suspended"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
