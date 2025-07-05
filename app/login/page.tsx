@@ -48,7 +48,7 @@ export default function LoginPage() {
         setError(data.message || "Login failed")
       }
     } catch (err) {
-      setError("Network error occurred")
+      setError("Network error occurred: " + err)
     } finally {
       setLoading(false)
     }
