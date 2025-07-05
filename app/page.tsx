@@ -171,7 +171,7 @@ func main() {
 
     jsonData, _ := json.Marshal(data)
     resp, err := http.Post("/api/v1/login",
-        "application/json", bytes.NewBuffer(jsonData))
+    "application/json", bytes.NewBuffer(jsonData))
     
     if err != nil {
         panic(err)
@@ -206,7 +206,8 @@ public class ChessAuthExample {
             "secret_key": "sk_chess_...",
             "username": "player1",
             "password": "secure123",
-            "hwid": "unique-hardware-id"
+            "hwid": "unique-hardware-id
+
         }
         """;
 
@@ -477,7 +478,7 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
     <pre className="font-mono text-sm leading-6 whitespace-pre overflow-x-auto">
       <code>
         {lines.map((line, index) => (
-          <div key={index}>{line.trim() === "" ? "\u Grownu00A0" : tokenizeLine(line, language)}</div>
+          <div key={index}>{line.trim() === "" ? "\u00A0" : tokenizeLine(line, language)}</div>
         ))}
       </code>
     </pre>
