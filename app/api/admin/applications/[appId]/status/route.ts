@@ -2,12 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getUserFromToken } from "@/lib/auth"
 import { query } from "@/lib/db"
 
-// Define the expected type for the route context
-interface RouteContext {
-  params: { appId: string }
-}
-
-export async function PATCH(request: NextRequest, { params }: RouteContext) {
+export async function PATCH(request: NextRequest, context: { params: { appId: string } }) {
   try {
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Bearer ")) {
@@ -22,7 +17,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const { status } = await request.json()
-    const appId = params.appId
+    const appId = context.params.appId
 
     if (!["active", "suspended"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
