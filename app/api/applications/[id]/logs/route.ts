@@ -23,11 +23,10 @@ interface Application {
   id: number
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = request.headers.get("authorization")
     const token = authHeader?.replace("Bearer ", "")
-
     if (!token) {
       return NextResponse.json(
         {
@@ -49,7 +48,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       )
     }
 
-    const { id: applicationId } = await params
+    // Await the params object
+    const resolvedParams = await params
+    const { id: applicationId } = resolvedParams
 
     const applications = (await query("SELECT id FROM applications WHERE id = ? AND user_id = ?", [
       applicationId,
@@ -103,9 +104,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const total = Array.isArray(countResult) ? countResult[0].total : 0
 
     const logs = (await query(
-      `SELECT id, username, action, user_agent, timestamp
-       FROM logs ${whereClause}
-       ORDER BY timestamp DESC
+      `SELECT id, username, action, user_agent, timestamp 
+       FROM logs ${whereClause} 
+       ORDER BY timestamp DESC 
        LIMIT ? OFFSET ?`,
       [...queryParams, limit, offset],
     )) as LogEntry[]

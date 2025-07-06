@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     }
 
     const user = users[0]
-
     const isValidPassword = await verifyPassword(password, user.password_hash)
+
     if (!isValidPassword) {
       return NextResponse.json(
         {
@@ -58,7 +58,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const token = generateToken({ userId: user.id, username: user.username, role: "user" })
+    // Convert user.id to string for the JWT payload
+    const token = generateToken({ 
+      userId: user.id.toString(), 
+      email: user.email, 
+      role: "user" 
+    })
 
     return NextResponse.json({
       success: true,

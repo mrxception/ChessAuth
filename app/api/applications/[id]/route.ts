@@ -2,18 +2,24 @@ import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getUserFromToken } from "@/lib/auth"
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
-
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+    }
+    
+    const token = authHeader.substring(7) 
     const user = await getUserFromToken(token)
+
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    const { id: appId } = await params
-
+    // Await the params object
+    const resolvedParams = await params
+    const { id: appId } = resolvedParams
 
     const apps = await query("SELECT id FROM applications WHERE id = ? AND user_id = ?", [appId, user.id])
 
@@ -33,18 +39,26 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
-
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+    }
+    
+    const token = authHeader.substring(7) 
     const user = await getUserFromToken(token)
+
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
-    const { id: appId } = await params
+
+    // Await the params object
+    const resolvedParams = await params
+    const { id: appId } = resolvedParams
 
     const apps = await query("SELECT id FROM applications WHERE id = ? AND user_id = ?", [appId, user.id])
 

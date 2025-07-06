@@ -32,6 +32,25 @@ interface ExistingUser {
   id: number
 }
 
+// Helper function to get IP address from request
+function getClientIP(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  const realIP = request.headers.get("x-real-ip")
+  const cfConnectingIP = request.headers.get("cf-connecting-ip")
+  
+  if (forwarded) {
+    return forwarded.split(',')[0].trim()
+  }
+  if (realIP) {
+    return realIP
+  }
+  if (cfConnectingIP) {
+    return cfConnectingIP
+  }
+  
+  return "unknown"
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as RegisterRequest
@@ -129,14 +148,20 @@ export async function POST(request: NextRequest) {
     const saltRounds = 12
     const password_hash = await bcrypt.hash(password, saltRounds)
 
-    const updateData: (string | null | number)[] = [username, password_hash, app.hwid_lock ? hwid : null, license.id]
+    // Handle hwid properly - convert undefined to null
+    const hwidValue = app.hwid_lock ? (hwid || null) : null
+    const updateData: (string | null | number)[] = [username, password_hash, hwidValue, license.id]
+
     await query("UPDATE licenses SET username = ?, password_hash = ?, hwid = ? WHERE id = ?", updateData)
+
+    // Get client IP using the helper function
+    const clientIP = getClientIP(request)
 
     await query("INSERT INTO logs (application_id, username, action, ip_address) VALUES (?, ?, ?, ?)", [
       app.id,
       username,
       "register",
-      request.ip || "unknown",
+      clientIP,
     ])
 
     return NextResponse.json({

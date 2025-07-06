@@ -3,20 +3,27 @@ import { query } from "@/lib/db"
 import { getUserFromToken } from "@/lib/auth"
 import bcrypt from "bcryptjs"
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string; userId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string; userId: string }> }) {
   try {
     const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+    }
+    
+    const token = authHeader.substring(7) 
     const user = await getUserFromToken(token)
 
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    const { id: appId } = await params
-    const { userId } = await params
+    // Await the params object and destructure both values
+    const resolvedParams = await params
+    const { id: appId, userId } = resolvedParams
 
     const apps = await query("SELECT id FROM applications WHERE id = ? AND user_id = ?", [appId, user.id])
+
     if (!Array.isArray(apps) || apps.length === 0) {
       return NextResponse.json({ success: false, message: "Application not found" }, { status: 404 })
     }
@@ -33,21 +40,29 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string; userId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; userId: string }> }) {
   try {
     const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+    }
+    
+    const token = authHeader.substring(7) 
     const user = await getUserFromToken(token)
 
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
-    const { id: appId } = await params
-    const { userId } = await params
+    // Await the params object and destructure both values
+    const resolvedParams = await params
+    const { id: appId, userId } = resolvedParams
+
     const body = await request.json()
 
     const apps = await query("SELECT id FROM applications WHERE id = ? AND user_id = ?", [appId, user.id])
+
     if (!Array.isArray(apps) || apps.length === 0) {
       return NextResponse.json({ success: false, message: "Application not found" }, { status: 404 })
     }
@@ -56,6 +71,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       userId,
       appId,
     ])
+
     if (!Array.isArray(existingUser) || existingUser.length === 0) {
       return NextResponse.json({ success: false, message: "User not found" }, { status: 404 })
     }
@@ -68,9 +84,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         "SELECT id FROM licenses WHERE application_id = ? AND username = ? AND id != ? AND username IS NOT NULL",
         [appId, body.username, userId],
       )
+
       if (Array.isArray(usernameCheck) && usernameCheck.length > 0) {
         return NextResponse.json({ success: false, message: "Username already exists" }, { status: 400 })
       }
+
       updateFields.push("username = ?")
       updateValues.push(body.username)
     }
@@ -107,7 +125,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     updateValues.push(userId, appId)
     const updateQuery = `UPDATE licenses SET ${updateFields.join(", ")} WHERE id = ? AND application_id = ?`
-
     await query(updateQuery, updateValues)
 
     return NextResponse.json({

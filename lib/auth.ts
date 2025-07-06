@@ -11,6 +11,14 @@ interface JwtPayload {
   role?: string
 }
 
+// Define an interface for the User object
+interface User {
+  id: string | number
+  email: string
+  username: string
+  role: string
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12)
 }
@@ -41,10 +49,10 @@ export function generateKey(prefix: string): string {
   return result
 }
 
-export async function getUserFromToken(token: string) {
+export async function getUserFromToken(token: string): Promise<User | null> {
   const decoded = verifyToken(token)
   if (!decoded) return null
-
-  const users = await query("SELECT id, email, username, role FROM users WHERE id = ?", [decoded.userId])
+  
+  const users = await query("SELECT id, email, username, role FROM users WHERE id = ?", [decoded.userId]) as User[]
   return Array.isArray(users) && users.length > 0 ? users[0] : null
 }

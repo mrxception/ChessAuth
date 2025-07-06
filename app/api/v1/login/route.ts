@@ -51,6 +51,25 @@ function corsHeaders() {
   }
 }
 
+// Helper function to get IP address from request
+function getClientIP(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  const realIP = request.headers.get("x-real-ip")
+  const cfConnectingIP = request.headers.get("cf-connecting-ip")
+  
+  if (forwarded) {
+    return forwarded.split(',')[0].trim()
+  }
+  if (realIP) {
+    return realIP
+  }
+  if (cfConnectingIP) {
+    return cfConnectingIP
+  }
+  
+  return "unknown"
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers: corsHeaders() })
 }
@@ -132,6 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordValid = await bcrypt.compare(password, license.password_hash)
+
     if (!passwordValid) {
       return NextResponse.json(
         {
@@ -162,6 +182,7 @@ export async function POST(request: NextRequest) {
           { status: 400, headers: corsHeaders() },
         )
       }
+
       if (license.hwid && license.hwid !== hwid) {
         return NextResponse.json(
           {
@@ -177,11 +198,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get client IP using the helper function
+    const clientIP = getClientIP(request)
+
     await query("INSERT INTO logs (application_id, username, action, ip_address) VALUES (?, ?, ?, ?)", [
       app.id,
       username,
       "login",
-      request.ip || "unknown",
+      clientIP,
     ])
 
     return NextResponse.json(

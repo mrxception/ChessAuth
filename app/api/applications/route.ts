@@ -24,8 +24,12 @@ interface CreateApplicationRequest {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
-
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+    }
+    
+    const token = authHeader.substring(7) 
     const user = await getUserFromToken(token)
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
@@ -54,8 +58,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
-
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+    }
+    
+    const token = authHeader.substring(7) 
     const user = await getUserFromToken(token)
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })

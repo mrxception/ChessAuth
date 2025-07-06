@@ -1,7 +1,5 @@
 "use client"
-
-import type React from "react"
-
+import React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ModernLayout } from "@/components/modern-layout"
@@ -28,6 +26,8 @@ import {
   TrendingUp,
   Server,
   Globe,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 
 interface AdminStats {
@@ -111,6 +111,92 @@ interface EmptyStateProps {
   icon: React.ComponentType<{ className?: string }>
 }
 
+interface PaginationProps {
+  currentPage: number
+  totalPages: number
+  onPageChange: (page: number) => void
+}
+
+const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) => {
+  const getVisiblePages = () => {
+    const delta = 2
+    const range = []
+    const rangeWithDots = []
+
+    for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
+      range.push(i)
+    }
+
+    if (currentPage - delta > 2) {
+      rangeWithDots.push(1, "...")
+    } else {
+      rangeWithDots.push(1)
+    }
+
+    rangeWithDots.push(...range)
+
+    if (currentPage + delta < totalPages - 1) {
+      rangeWithDots.push("...", totalPages)
+    } else if (totalPages > 1) {
+      rangeWithDots.push(totalPages)
+    }
+
+    return rangeWithDots
+  }
+
+  if (totalPages <= 1) return null
+
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-700">
+      <div className="flex items-center text-sm text-gray-400">
+        Page {currentPage} of {totalPages}
+      </div>
+      <div className="flex items-center space-x-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="text-gray-400 hover:text-white disabled:opacity-50"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        {getVisiblePages().map((page, index) => (
+          <React.Fragment key={index}>
+            {page === "..." ? (
+              <span className="px-2 py-1 text-gray-500">...</span>
+            ) : (
+              <Button
+                variant={currentPage === page ? "default" : "ghost"}
+                size="sm"
+                onClick={() => onPageChange(page as number)}
+                className={
+                  currentPage === page
+                    ? "bg-yellow-500 text-black hover:bg-yellow-600"
+                    : "text-gray-400 hover:text-white"
+                }
+              >
+                {page}
+              </Button>
+            )}
+          </React.Fragment>
+        ))}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="text-gray-400 hover:text-white disabled:opacity-50"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -123,7 +209,6 @@ export default function AdminPanel() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [actionLoading, setActionLoading] = useState<ActionLoading>({})
-
   const [loadingStates, setLoadingStates] = useState<LoadingStates>({
     stats: false,
     users: false,
@@ -131,6 +216,16 @@ export default function AdminPanel() {
     licenses: false,
     logs: false,
   })
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState({
+    users: 1,
+    applications: 1,
+    licenses: 1,
+    logs: 1,
+  })
+
+  const ITEMS_PER_PAGE = 10
 
   const [messageBox, setMessageBox] = useState<Omit<MessageBoxProps, "isOpen"> & { isOpen: boolean }>({
     isOpen: false,
@@ -149,7 +244,6 @@ export default function AdminPanel() {
       router.push("/login")
       return
     }
-
     try {
       const response = await fetch("/api/auth/me", {
         headers: { Authorization: `Bearer ${token}` },
@@ -289,6 +383,14 @@ export default function AdminPanel() {
     }
   }, [success, error])
 
+  // Reset pagination when switching tabs or searching
+  useEffect(() => {
+    setCurrentPage((prev) => ({
+      ...prev,
+      [activeTab]: 1,
+    }))
+  }, [activeTab, searchTerm])
+
   const showMessageBox = (config: Omit<MessageBoxProps, "isOpen" | "onClose">) => {
     setMessageBox({
       ...config,
@@ -400,39 +502,33 @@ export default function AdminPanel() {
     })
   }
 
-  const filteredUsers = users
-    .filter(
-      (user) =>
-        user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()),
+  // Filter and paginate data
+  const getFilteredAndPaginatedData = (data: any[], searchFields: string[], tabName: string) => {
+    const filtered = data.filter((item) =>
+      searchFields.some((field) => {
+        const value = field.split(".").reduce((obj, key) => obj?.[key], item)
+        return value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      }),
     )
-    .slice(0, 10)
 
-  const filteredApplications = applications
-    .filter(
-      (app) =>
-        app.app_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        app.owner_username.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-    .slice(0, 10)
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+    const startIndex = (currentPage[tabName as keyof typeof currentPage] - 1) * ITEMS_PER_PAGE
+    const paginatedData = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
-  const filteredLicenses = licenses
-    .filter(
-      (license) =>
-        license.license_key.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (license.username && license.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        license.app_name.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-    .slice(0, 10)
+    return { data: paginatedData, totalPages, totalItems: filtered.length }
+  }
 
-  const filteredLogs = logs
-    .filter(
-      (log) =>
-        log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.username && log.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (log.app_name && log.app_name.toLowerCase().includes(searchTerm.toLowerCase())),
-    )
-    .slice(0, 10)
+  const filteredUsers = getFilteredAndPaginatedData(users, ["username", "email"], "users")
+  const filteredApplications = getFilteredAndPaginatedData(applications, ["app_name", "owner_username"], "applications")
+  const filteredLicenses = getFilteredAndPaginatedData(licenses, ["license_key", "username", "app_name"], "licenses")
+  const filteredLogs = getFilteredAndPaginatedData(logs, ["action", "username", "app_name"], "logs")
+
+  const handlePageChange = (tabName: string, page: number) => {
+    setCurrentPage((prev) => ({
+      ...prev,
+      [tabName]: page,
+    }))
+  }
 
   const TableLoading = () => (
     <div className="flex items-center justify-center py-12">
@@ -660,9 +756,9 @@ export default function AdminPanel() {
         {/* Users Tab */}
         {activeTab === "users" && (
           <div className="space-y-6">
-            <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h2 className="text-xl font-bold text-white">System Users</h2>
-              <div className="relative w-full sm:w-64 sm:ml-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search users..."
@@ -674,85 +770,88 @@ export default function AdminPanel() {
             </div>
 
             <ModernCard>
-              <CardContent>
+              <CardContent className="p-0">
                 {loadingStates.users ? (
                   <TableLoading />
-                ) : filteredUsers.length > 0 ? (
-                  <div className="overflow-x-auto -mx-4 sm:mx-0">
-                    <div className="inline-block min-w-full align-middle">
-                      <div className="overflow-hidden">
-                        <table className="min-w-full">
-                          <thead>
-                            <tr className="border-b border-gray-700">
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Email</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Role</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Apps</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Created</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredUsers.map((user) => (
-                              <tr key={user.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
-                                <td className="py-3 px-4 font-medium text-white">{user.username}</td>
-                                <td className="py-3 px-4 text-gray-300">{user.email}</td>
-                                <td className="py-3 px-4">
-                                  <span
-                                    className={`px-2 py-1 text-xs rounded-full ${
-                                      user.role === "admin"
-                                        ? "bg-red-500/20 text-red-400 border border-red-500/50"
-                                        : "bg-blue-500/20 text-blue-400 border border-blue-500/50"
-                                    }`}
+                ) : filteredUsers.data.length > 0 ? (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Email</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Role</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Apps</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Created</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredUsers.data.map((user) => (
+                            <tr key={user.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
+                              <td className="py-3 px-4 font-medium text-white">{user.username}</td>
+                              <td className="py-3 px-4 text-gray-300">{user.email}</td>
+                              <td className="py-3 px-4">
+                                <span
+                                  className={`px-2 py-1 text-xs rounded-full ${
+                                    user.role === "admin"
+                                      ? "bg-red-500/20 text-red-400 border border-red-500/50"
+                                      : "bg-blue-500/20 text-blue-400 border border-blue-500/50"
+                                  }`}
+                                >
+                                  {user.role}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-gray-300">{user.app_count}</td>
+                              <td className="py-3 px-4 text-gray-300">
+                                {new Date(user.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => toggleUserRole(user.id, user.role, user.username)}
+                                    className="text-blue-400 hover:text-blue-300"
+                                    title={`Make ${user.role === "admin" ? "user" : "admin"}`}
+                                    disabled={actionLoading[`user-${user.id}`]}
                                   >
-                                    {user.role}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-4 text-gray-300">{user.app_count}</td>
-                                <td className="py-3 px-4 text-gray-300">
-                                  {new Date(user.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center space-x-2">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => toggleUserRole(user.id, user.role, user.username)}
-                                      className="text-blue-400 hover:text-blue-300"
-                                      title={`Make ${user.role === "admin" ? "user" : "admin"}`}
-                                      disabled={actionLoading[`user-${user.id}`]}
-                                    >
-                                      {actionLoading[`user-${user.id}`] ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : user.role === "admin" ? (
-                                        <UserCheck className="h-4 w-4" />
-                                      ) : (
-                                        <Shield className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => deleteUser(user.id, user.username)}
-                                      className="text-red-400 hover:text-red-300"
-                                      title="Delete user"
-                                      disabled={actionLoading[`delete-user-${user.id}`]}
-                                    >
-                                      {actionLoading[`delete-user-${user.id}`] ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Trash2 className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                                    {actionLoading[`user-${user.id}`] ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : user.role === "admin" ? (
+                                      <UserCheck className="h-4 w-4" />
+                                    ) : (
+                                      <Shield className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteUser(user.id, user.username)}
+                                    className="text-red-400 hover:text-red-300"
+                                    title="Delete user"
+                                    disabled={actionLoading[`delete-user-${user.id}`]}
+                                  >
+                                    {actionLoading[`delete-user-${user.id}`] ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
+                    <Pagination
+                      currentPage={currentPage.users}
+                      totalPages={filteredUsers.totalPages}
+                      onPageChange={(page) => handlePageChange("users", page)}
+                    />
+                  </>
                 ) : (
                   <EmptyState message="No users found" icon={Users} />
                 )}
@@ -764,9 +863,9 @@ export default function AdminPanel() {
         {/* Applications Tab */}
         {activeTab === "applications" && (
           <div className="space-y-6">
-            <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h2 className="text-xl font-bold text-white">All Applications</h2>
-              <div className="relative w-full sm:w-64 sm:ml-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search applications..."
@@ -778,80 +877,83 @@ export default function AdminPanel() {
             </div>
 
             <ModernCard>
-              <CardContent>
+              <CardContent className="p-0">
                 {loadingStates.applications ? (
                   <TableLoading />
-                ) : filteredApplications.length > 0 ? (
-                  <div className="overflow-x-auto -mx-4 sm:mx-0">
-                    <div className="inline-block min-w-full align-middle">
-                      <div className="overflow-hidden">
-                        <table className="min-w-full">
-                          <thead>
-                            <tr className="border-b border-gray-700">
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Application</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Owner</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Users</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Licenses</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Created</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Actions</th>
+                ) : filteredApplications.data.length > 0 ? (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Application</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Owner</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Users</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Licenses</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Created</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredApplications.data.map((app) => (
+                            <tr key={app.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
+                              <td className="py-3 px-4 font-medium text-white">{app.app_name}</td>
+                              <td className="py-3 px-4 text-gray-300">
+                                <div>
+                                  <div className="font-medium">{app.owner_username}</div>
+                                  <div className="text-xs text-gray-500">{app.owner_email}</div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span
+                                  className={`px-2 py-1 text-xs rounded-full ${
+                                    app.status === "active"
+                                      ? "bg-green-500/20 text-green-400 border border-green-500/50"
+                                      : "bg-red-500/20 text-red-400 border border-red-500/50"
+                                  }`}
+                                >
+                                  {app.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-gray-300">{app.user_count}</td>
+                              <td className="py-3 px-4 text-gray-300">{app.license_count}</td>
+                              <td className="py-3 px-4 text-gray-300">
+                                {new Date(app.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 px-4">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => suspendApplication(app.id, app.app_name, app.status)}
+                                  className={
+                                    app.status === "active"
+                                      ? "text-orange-400 hover:text-orange-300"
+                                      : "text-green-400 hover:text-green-300"
+                                  }
+                                  title={app.status === "active" ? "Suspend application" : "Activate application"}
+                                  disabled={actionLoading[`app-${app.id}`]}
+                                >
+                                  {actionLoading[`app-${app.id}`] ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : app.status === "active" ? (
+                                    <Ban className="h-4 w-4" />
+                                  ) : (
+                                    <UserCheck className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {filteredApplications.map((app) => (
-                              <tr key={app.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
-                                <td className="py-3 px-4 font-medium text-white">{app.app_name}</td>
-                                <td className="py-3 px-4 text-gray-300">
-                                  <div>
-                                    <div className="font-medium">{app.owner_username}</div>
-                                    <div className="text-xs text-gray-500">{app.owner_email}</div>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4">
-                                  <span
-                                    className={`px-2 py-1 text-xs rounded-full ${
-                                      app.status === "active"
-                                        ? "bg-green-500/20 text-green-400 border border-green-500/50"
-                                        : "bg-red-500/20 text-red-400 border border-red-500/50"
-                                    }`}
-                                  >
-                                    {app.status}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-4 text-gray-300">{app.user_count}</td>
-                                <td className="py-3 px-4 text-gray-300">{app.license_count}</td>
-                                <td className="py-3 px-4 text-gray-300">
-                                  {new Date(app.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => suspendApplication(app.id, app.app_name, app.status)}
-                                    className={
-                                      app.status === "active"
-                                        ? "text-orange-400 hover:text-orange-300"
-                                        : "text-green-400 hover:text-green-300"
-                                    }
-                                    title={app.status === "active" ? "Suspend application" : "Activate application"}
-                                    disabled={actionLoading[`app-${app.id}`]}
-                                  >
-                                    {actionLoading[`app-${app.id}`] ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : app.status === "active" ? (
-                                      <Ban className="h-4 w-4" />
-                                    ) : (
-                                      <UserCheck className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
+                    <Pagination
+                      currentPage={currentPage.applications}
+                      totalPages={filteredApplications.totalPages}
+                      onPageChange={(page) => handlePageChange("applications", page)}
+                    />
+                  </>
                 ) : (
                   <EmptyState message="No applications found" icon={Crown} />
                 )}
@@ -863,9 +965,9 @@ export default function AdminPanel() {
         {/* Licenses Tab */}
         {activeTab === "licenses" && (
           <div className="space-y-6">
-            <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h2 className="text-xl font-bold text-white">All Licenses</h2>
-              <div className="relative w-full sm:w-64 sm:ml-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search licenses..."
@@ -877,70 +979,73 @@ export default function AdminPanel() {
             </div>
 
             <ModernCard>
-              <CardContent>
+              <CardContent className="p-0">
                 {loadingStates.licenses ? (
                   <TableLoading />
-                ) : filteredLicenses.length > 0 ? (
-                  <div className="overflow-x-auto -mx-4 sm:mx-0">
-                    <div className="inline-block min-w-full align-middle">
-                      <div className="overflow-hidden">
-                        <table className="min-w-full">
-                          <thead>
-                            <tr className="border-b border-gray-700">
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">License Key</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Application</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Owner</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Used By</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Expires</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredLicenses.map((license) => (
-                              <tr key={license.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
-                                <td className="py-3 px-4 font-mono text-sm text-white">
-                                  {license.license_key.substring(0, 20)}...
-                                </td>
-                                <td className="py-3 px-4 text-gray-300">{license.app_name}</td>
-                                <td className="py-3 px-4 text-gray-300">{license.owner_username}</td>
-                                <td className="py-3 px-4 text-gray-300">
-                                  {license.username || <span className="text-gray-500">Not used</span>}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/50">
-                                    {license.subscription_type}
+                ) : filteredLicenses.data.length > 0 ? (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">License Key</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Application</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Owner</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Used By</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Expires</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredLicenses.data.map((license) => (
+                            <tr key={license.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
+                              <td className="py-3 px-4 font-mono text-sm text-white">
+                                {license.license_key.substring(0, 20)}...
+                              </td>
+                              <td className="py-3 px-4 text-gray-300">{license.app_name}</td>
+                              <td className="py-3 px-4 text-gray-300">{license.owner_username}</td>
+                              <td className="py-3 px-4 text-gray-300">
+                                {license.username || <span className="text-gray-500">Not used</span>}
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/50">
+                                  {license.subscription_type}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-gray-300">
+                                {license.expires_at ? new Date(license.expires_at).toLocaleDateString() : "Never"}
+                              </td>
+                              <td className="py-3 px-4">
+                                {license.is_banned ? (
+                                  <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/50">
+                                    Banned
                                   </span>
-                                </td>
-                                <td className="py-3 px-4 text-gray-300">
-                                  {license.expires_at ? new Date(license.expires_at).toLocaleDateString() : "Never"}
-                                </td>
-                                <td className="py-3 px-4">
-                                  {license.is_banned ? (
-                                    <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/50">
-                                      Banned
-                                    </span>
-                                  ) : license.expires_at && new Date(license.expires_at) < new Date() ? (
-                                    <span className="px-2 py-1 text-xs rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/50">
-                                      Expired
-                                    </span>
-                                  ) : license.username ? (
-                                    <span className="px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/50">
-                                      Used
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/50">
-                                      Available
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                                ) : license.expires_at && new Date(license.expires_at) < new Date() ? (
+                                  <span className="px-2 py-1 text-xs rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/50">
+                                    Expired
+                                  </span>
+                                ) : license.username ? (
+                                  <span className="px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/50">
+                                    Used
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/50">
+                                    Available
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
+                    <Pagination
+                      currentPage={currentPage.licenses}
+                      totalPages={filteredLicenses.totalPages}
+                      onPageChange={(page) => handlePageChange("licenses", page)}
+                    />
+                  </>
                 ) : (
                   <EmptyState message="No licenses found" icon={Key} />
                 )}
@@ -952,9 +1057,9 @@ export default function AdminPanel() {
         {/* Logs Tab */}
         {activeTab === "logs" && (
           <div className="space-y-6">
-            <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h2 className="text-xl font-bold text-white">Activity Logs</h2>
-              <div className="relative w-full sm:w-64 sm:ml-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search logs..."
@@ -966,40 +1071,43 @@ export default function AdminPanel() {
             </div>
 
             <ModernCard>
-              <CardContent>
+              <CardContent className="p-0">
                 {loadingStates.logs ? (
                   <TableLoading />
-                ) : filteredLogs.length > 0 ? (
-                  <div className="overflow-x-auto -mx-4 sm:mx-0">
-                    <div className="inline-block min-w-full align-middle">
-                      <div className="overflow-hidden">
-                        <table className="min-w-full">
-                          <thead>
-                            <tr className="border-b border-gray-700">
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Timestamp</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Action</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Application</th>
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Owner</th>
+                ) : filteredLogs.data.length > 0 ? (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Timestamp</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Action</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Application</th>
+                            <th className="text-left py-3 px-4 text-gray-300 font-medium">Owner</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredLogs.data.map((log) => (
+                            <tr key={log.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
+                              <td className="py-3 px-4 text-gray-300 text-sm">
+                                {new Date(log.timestamp).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-4 font-medium text-white">{log.action}</td>
+                              <td className="py-3 px-4 text-gray-300">{log.username || "N/A"}</td>
+                              <td className="py-3 px-4 text-gray-300">{log.app_name || "N/A"}</td>
+                              <td className="py-3 px-4 text-gray-300">{log.app_owner || "N/A"}</td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {filteredLogs.map((log) => (
-                              <tr key={log.id} className="border-b border-gray-700/50 hover:bg-gray-800/20">
-                                <td className="py-3 px-4 text-gray-300 text-sm">
-                                  {new Date(log.timestamp).toLocaleString()}
-                                </td>
-                                <td className="py-3 px-4 font-medium text-white">{log.action}</td>
-                                <td className="py-3 px-4 text-gray-300">{log.username || "N/A"}</td>
-                                <td className="py-3 px-4 text-gray-300">{log.app_name || "N/A"}</td>
-                                <td className="py-3 px-4 text-gray-300">{log.app_owner || "N/A"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
+                    <Pagination
+                      currentPage={currentPage.logs}
+                      totalPages={filteredLogs.totalPages}
+                      onPageChange={(page) => handlePageChange("logs", page)}
+                    />
+                  </>
                 ) : (
                   <EmptyState message="No activity logs found" icon={Activity} />
                 )}

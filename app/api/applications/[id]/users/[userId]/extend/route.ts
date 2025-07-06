@@ -5,7 +5,12 @@ import { getUserFromToken } from "@/lib/auth"
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; userId: string }> }) {
   try {
     const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+    }
+    
+    const token = authHeader.substring(7) 
     const user = await getUserFromToken(token)
 
     if (!user) {
