@@ -59,6 +59,7 @@ interface AdminUser {
   role: string
   created_at: string
   app_count: number
+  [key: string]: unknown
 }
 
 interface AdminApplication {
@@ -71,6 +72,7 @@ interface AdminApplication {
   created_at: string
   user_count: number
   license_count: number
+  [key: string]: unknown
 }
 
 interface AdminLicense {
@@ -83,6 +85,7 @@ interface AdminLicense {
   expires_at: string | null
   is_banned: boolean
   created_at: string
+  [key: string]: unknown
 }
 
 interface AdminLog {
@@ -92,6 +95,7 @@ interface AdminLog {
   timestamp: string
   app_name: string | null
   app_owner: string | null
+  [key: string]: unknown
 }
 
 interface LoadingStates {
@@ -503,11 +507,16 @@ export default function AdminPanel() {
   }
 
   // Filter and paginate data
-  const getFilteredAndPaginatedData = (data: any[], searchFields: string[], tabName: string) => {
+  const getFilteredAndPaginatedData = <T extends Record<string, unknown>>(
+    data: T[],
+    searchFields: string[],
+    tabName: string,
+  ) => {
     const filtered = data.filter((item) =>
       searchFields.some((field) => {
-        const value = field.split(".").reduce((obj, key) => obj?.[key], item)
-        return value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+        const value = item[field]
+        const stringValue = value ? String(value) : ""
+        return stringValue.toLowerCase().includes(searchTerm.toLowerCase())
       }),
     )
 
