@@ -303,32 +303,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   }
 }`,
   },
-  curl: {
-    name: "cURL",
-    icon: "🌐",
-    code: `curl -X POST /api/v1/login \\
-  -H "Content-Type: application/json" \\
-  -H "User-Agent: ChessAuth-Client/1.0" \\
-  -d '{
-    "public_key": "pk_chess_...",
-    "secret_key": "sk_chess_...",
-    "username": "player1",
-    "password": "secure123",
-    "hwid": "unique-hardware-id"
-  }' \\
-  --silent \\
-  --show-error \\
-  | jq '.'`,
-    response: `{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "username": "player1",
-    "subscription": "pro",
-    "expires_at": "2024-12-31"
-  }
-}`,
-  },
 }
 
 const features = [
@@ -426,7 +400,6 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
       java: ["public", "private", "class", "static", "import", "new", "if", "else", "return", "String", "void"],
       ruby: ["require", "def", "class", "if", "else", "elsif", "end", "puts", "return"],
       rust: ["use", "fn", "let", "mut", "if", "else", "match", "async", "await", "pub", "struct", "impl"],
-      curl: ["curl"],
     }
 
     const langKeywords = keywords[lang as keyof typeof keywords] || []

@@ -361,32 +361,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   }
 }`,
   },
-  curl: {
-    name: "cURL",
-    icon: "🌐",
-    getCode: (publicKey: string, secretKey: string) => `curl -X POST /api/v1/login \\
-  -H "Content-Type: application/json" \\
-  -H "User-Agent: ChessAuth-Client/1.0" \\
-  -d '{
-    "public_key": "${publicKey}",
-    "secret_key": "${secretKey}",
-    "username": "player1",
-    "password": "secure123",
-    "hwid": "unique-hardware-id"
-  }' \\
-  --silent \\
-  --show-error \\
-  | jq '.'`,
-    response: `{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "username": "player1",
-    "subscription": "pro",
-    "expires_at": "2024-12-31"
-  }
-}`,
-  },
 }
 
 function SyntaxHighlighter({ code, language }: { code: string; language: string }) {
@@ -433,7 +407,6 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
       java: ["public", "private", "class", "static", "import", "new", "if", "else", "return", "String", "void"],
       ruby: ["require", "def", "class", "if", "else", "elsif", "end", "puts", "return"],
       rust: ["use", "fn", "let", "mut", "if", "else", "match", "async", "await", "pub", "struct", "impl"],
-      curl: ["curl"],
     }
 
     const langKeywords = keywords[lang as keyof typeof keywords] || []
@@ -1194,7 +1167,7 @@ export default function DashboardPage() {
 
             {/* Language Selector */}
             <div className="flex justify-center">
-              <div className="flex flex-nowrap gap-2 p-3 bg-black/30 rounded-xl border border-yellow-500/20 backdrop-blur-sm max-w-4xl">
+              <div className="flex flex-wrap gap-2 p-3 bg-black/30 rounded-xl border border-yellow-500/20 backdrop-blur-sm max-w-4xl">
                 {Object.entries(codeExamples).map(([key, lang]) => (
                   <Button
                     key={key}
