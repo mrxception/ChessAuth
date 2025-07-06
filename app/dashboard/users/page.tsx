@@ -116,11 +116,9 @@ export default function UsersPage() {
   })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-
   const [actionLoading, setActionLoading] = useState<ActionLoading>({})
   const [createLoading, setCreateLoading] = useState(false)
   const [extendLoading, setExtendLoading] = useState(false)
-
   const [messageBox, setMessageBox] = useState<Omit<MessageBoxProps, "isOpen"> & { isOpen: boolean }>({
     isOpen: false,
     type: "confirm",
@@ -244,6 +242,7 @@ export default function UsersPage() {
     setCreateLoading(true)
     setError("")
     setSuccess("")
+
     const token = localStorage.getItem("token")
 
     let expiresAt = null
@@ -269,7 +268,9 @@ export default function UsersPage() {
           expires_at: expiresAt,
         }),
       })
+
       const data: ApiResponse = await response.json()
+
       if (data.success) {
         setSuccess("User created successfully!")
         setFormData({
@@ -294,9 +295,11 @@ export default function UsersPage() {
   const extendUser = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedUser) return
+
     setExtendLoading(true)
     setError("")
     setSuccess("")
+
     const token = localStorage.getItem("token")
 
     let newExpiresAt = null
@@ -320,7 +323,9 @@ export default function UsersPage() {
           expires_at: newExpiresAt,
         }),
       })
+
       const data: ApiResponse = await response.json()
+
       if (data.success) {
         setSuccess(`User ${selectedUser.username} expiration extended successfully!`)
         setExtendData({
@@ -343,6 +348,7 @@ export default function UsersPage() {
   const toggleBanUser = async (userId: number, currentBanStatus: boolean, username: string) => {
     setUserActionLoading(userId, "ban", true)
     const token = localStorage.getItem("token")
+
     try {
       const response = await fetch(`/api/applications/${selectedApp}/users/${userId}/ban`, {
         method: "PATCH",
@@ -352,6 +358,7 @@ export default function UsersPage() {
         },
         body: JSON.stringify({ is_banned: !currentBanStatus }),
       })
+
       if (response.ok) {
         fetchUsers()
         setSuccess(`User ${username} ${!currentBanStatus ? "banned" : "unbanned"} successfully!`)
@@ -375,6 +382,7 @@ export default function UsersPage() {
       onConfirm: async () => {
         setUserActionLoading(userId, "hwid", true)
         const token = localStorage.getItem("token")
+
         try {
           const response = await fetch(`/api/applications/${selectedApp}/users/${userId}`, {
             method: "PATCH",
@@ -384,7 +392,9 @@ export default function UsersPage() {
             },
             body: JSON.stringify({ reset_hwid: true }),
           })
+
           const data: ApiResponse = await response.json()
+
           if (data.success) {
             fetchUsers()
             setSuccess(`HWID reset successfully for user "${username}"!`)
@@ -410,11 +420,13 @@ export default function UsersPage() {
       onConfirm: async () => {
         setUserActionLoading(userId, "delete", true)
         const token = localStorage.getItem("token")
+
         try {
           const response = await fetch(`/api/applications/${selectedApp}/users/${userId}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
           })
+
           if (response.ok) {
             fetchUsers()
             setSuccess("User deleted successfully!")
@@ -483,6 +495,7 @@ export default function UsersPage() {
         </span>
       )
     }
+
     if (user.expires_at && new Date(user.expires_at) < new Date()) {
       return (
         <span className="px-2 py-1 text-xs rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/50">
@@ -490,6 +503,7 @@ export default function UsersPage() {
         </span>
       )
     }
+
     return (
       <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/50">
         Active
@@ -522,12 +536,12 @@ export default function UsersPage() {
             </h1>
             <p className="text-gray-400 mt-1">Manage users and their access permissions</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
             <div className="relative">
               <select
                 value={selectedApp}
                 onChange={(e) => setSelectedApp(e.target.value)}
-                className="appearance-none px-4 py-2 pr-8 bg-gray-800/80 border border-gray-600 text-white rounded-lg focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 backdrop-blur-sm min-w-[200px]"
+                className="appearance-none px-4 py-2 pr-8 bg-gray-800/80 border border-gray-600 text-white rounded-lg focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 backdrop-blur-sm w-full md:min-w-[200px]"
               >
                 <option value="">Select Application</option>
                 {applications.map((app) => (
@@ -544,7 +558,7 @@ export default function UsersPage() {
             </div>
             <Button
               onClick={() => setShowCreateForm(true)}
-              className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold"
+              className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold w-full md:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create User
@@ -611,6 +625,7 @@ export default function UsersPage() {
                       />
                     </div>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <div className="relative">
@@ -627,6 +642,7 @@ export default function UsersPage() {
                       />
                     </div>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="subscription">Subscription Type</Label>
                     <select
@@ -646,6 +662,7 @@ export default function UsersPage() {
                       </option>
                     </select>
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="expires_at">Expiration Date</Label>
@@ -674,6 +691,7 @@ export default function UsersPage() {
                       />
                     </div>
                   </div>
+
                   <div className="flex space-x-2">
                     <Button
                       type="submit"
@@ -1039,6 +1057,7 @@ export default function UsersPage() {
                     } else {
                       pageNum = currentPage - 2 + i
                     }
+
                     return (
                       <Button
                         key={pageNum}

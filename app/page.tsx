@@ -19,14 +19,14 @@ import {
   ChevronRight,
   Play,
   Copy,
+  Check,
 } from "lucide-react"
 
 const codeExamples = {
   javascript: {
     name: "JavaScript",
     icon: "🟨",
-    code: `
-const response = await fetch('/api/v1/login', {
+    code: `const response = await fetch('/api/v1/login', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -102,6 +102,7 @@ $options = array(
 $context = stream_context_create($options);
 $result = file_get_contents('/api/v1/login', false, $context);
 $response = json_decode($result, true);
+
 print_r($response);
 ?>`,
     response: `{
@@ -136,6 +137,7 @@ var content = new StringContent(json, Encoding.UTF8, "application/json");
 
 var response = await client.PostAsync("/api/v1/login", content);
 var result = await response.Content.ReadAsStringAsync();
+
 Console.WriteLine(result);`,
     response: `{
   "success": true,
@@ -165,7 +167,7 @@ func main() {
         "password": "secure123",
         "hwid": "unique-hardware-id",
     }
-
+    
     jsonData, _ := json.Marshal(data)
     resp, err := http.Post("/api/v1/login",
     "application/json", bytes.NewBuffer(jsonData))
@@ -203,8 +205,7 @@ public class ChessAuthExample {
             "secret_key": "sk_chess_...",
             "username": "player1",
             "password": "secure123",
-            "hwid": "unique-hardware-id
-
+            "hwid": "unique-hardware-id"
         }
         """;
 
@@ -217,7 +218,6 @@ public class ChessAuthExample {
 
         HttpResponse<String> response = client.send(request,
             HttpResponse.BodyHandlers.ofString());
-
         System.out.println(response.body());
     }
 }`,
@@ -430,7 +430,6 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
     }
 
     const langKeywords = keywords[lang as keyof typeof keywords] || []
-
     if (langKeywords.includes(token)) {
       return "text-purple-400"
     }
@@ -460,7 +459,6 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
 
   const tokenizeLine = (line: string, lang: string) => {
     const tokens = line.split(/(\s+|[{}()[\],.;:=<>!&|+\-*/])/).filter((token) => token.length > 0)
-
     return tokens.map((token, index) => {
       const color = getTokenColor(token.trim(), lang)
       return (
@@ -484,9 +482,18 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
 
 export default function HomePage() {
   const [selectedLanguage, setSelectedLanguage] = useState<keyof typeof codeExamples>("javascript")
+  const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({})
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, buttonId: string) => {
     navigator.clipboard.writeText(text)
+
+    // Set the copied state for this specific button
+    setCopiedStates((prev) => ({ ...prev, [buttonId]: true }))
+
+    // Reset after 3 seconds
+    setTimeout(() => {
+      setCopiedStates((prev) => ({ ...prev, [buttonId]: false }))
+    }, 3000)
   }
 
   return (
@@ -528,7 +535,7 @@ export default function HomePage() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500 px-8 py-4 text-lg bg-transparent backdrop-blur-sm"
+                  className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500 px-8 py-4 text-lg bg-transparent backdrop-blur-sm transition-all duration-300"
                 >
                   <Shield className="mr-2 h-5 w-5" />
                   Sign In
@@ -623,10 +630,20 @@ export default function HomePage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => copyToClipboard(codeExamples[selectedLanguage].code)}
-                      className="text-gray-400 hover:text-white"
+                      onClick={() =>
+                        copyToClipboard(codeExamples[selectedLanguage].code, `request-${selectedLanguage}`)
+                      }
+                      className={`transition-all duration-200 ${
+                        copiedStates[`request-${selectedLanguage}`]
+                          ? "text-green-400 hover:text-green-300"
+                          : "text-gray-400 hover:text-white"
+                      }`}
                     >
-                      <Copy className="h-4 w-4" />
+                      {copiedStates[`request-${selectedLanguage}`] ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                   {/* Code Content */}
@@ -655,10 +672,20 @@ export default function HomePage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => copyToClipboard(codeExamples[selectedLanguage].response)}
-                      className="text-gray-400 hover:text-white"
+                      onClick={() =>
+                        copyToClipboard(codeExamples[selectedLanguage].response, `response-${selectedLanguage}`)
+                      }
+                      className={`transition-all duration-200 ${
+                        copiedStates[`response-${selectedLanguage}`]
+                          ? "text-green-400 hover:text-green-300"
+                          : "text-gray-400 hover:text-white"
+                      }`}
                     >
-                      <Copy className="h-4 w-4" />
+                      {copiedStates[`response-${selectedLanguage}`] ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                   {/* Code Content */}
@@ -712,7 +739,7 @@ export default function HomePage() {
             ].map((feature, index) => (
               <div
                 key={index}
-                className="flex items-center space-x-3 p-4 rounded-lg bg-gray-800/20 border border-gray-700/50 hover:border-yellow-500/30 transition-colors"
+                className="flex items-center space-x-3 p-4 rounded-lg bg-gray-800/20 border border-gray-700/50 hover:border-yellow-500/30 transition-colors duration-300"
               >
                 <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
                 <span className="text-gray-300">{feature}</span>

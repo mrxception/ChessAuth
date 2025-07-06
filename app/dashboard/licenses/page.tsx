@@ -89,7 +89,6 @@ export default function LicensesPage() {
   const [licensesLoading, setLicensesLoading] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<ActionLoading>({})
-
   const [messageBox, setMessageBox] = useState<Omit<MessageBoxProps, "isOpen"> & { isOpen: boolean }>({
     isOpen: false,
     type: "confirm",
@@ -207,9 +206,10 @@ export default function LicensesPage() {
     setCreateLoading(true)
     setError("")
     setSuccess("")
-    const token = localStorage.getItem("token")
 
+    const token = localStorage.getItem("token")
     let expiresAt = null
+
     if (formData.expires_at) {
       expiresAt = formData.expires_at
     } else if (formData.duration_days) {
@@ -220,6 +220,7 @@ export default function LicensesPage() {
 
     const quantity = Number.parseInt(formData.quantity)
     const licenses = []
+
     for (let i = 0; i < quantity; i++) {
       licenses.push({
         license_key: generateLicenseKey(formData.format),
@@ -237,6 +238,7 @@ export default function LicensesPage() {
         },
         body: JSON.stringify({ licenses }),
       })
+
       const data = await response.json()
       if (data.success) {
         setSuccess(`${quantity} license${quantity > 1 ? "s" : ""} created successfully!`)
@@ -391,12 +393,12 @@ export default function LicensesPage() {
             </h1>
             <p className="text-gray-400 mt-1">Generate and manage license keys for your applications</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center space-y-4 md:space-y-0 md:space-x-4 w-full md:w-auto">
             <div className="relative">
               <select
                 value={selectedApp}
                 onChange={(e) => setSelectedApp(e.target.value)}
-                className="appearance-none px-4 py-2 pr-8 bg-gray-800/80 border border-gray-600 text-white rounded-lg focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 backdrop-blur-sm min-w-[200px]"
+                className="appearance-none px-4 py-2 pr-8 bg-gray-800/80 border border-gray-600 text-white rounded-lg focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 backdrop-blur-sm w-full md:min-w-[200px]"
               >
                 <option value="">Select Application</option>
                 {applications.map((app) => (
@@ -413,7 +415,7 @@ export default function LicensesPage() {
             </div>
             <Button
               onClick={() => setShowCreateForm(true)}
-              className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold"
+              className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold w-full md:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Generate Licenses
@@ -740,7 +742,6 @@ export default function LicensesPage() {
                     ))}
                   </tbody>
                 </table>
-
                 {currentLicenses.length === 0 && !licensesLoading && (
                   <div className="text-center py-8">
                     <Key className="h-12 w-12 text-gray-600 mx-auto mb-4" />

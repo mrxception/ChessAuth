@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -29,6 +28,9 @@ import {
   AlertCircle,
   Loader2,
   Check,
+  Code,
+  Database,
+  Play,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -78,6 +80,413 @@ interface CopyStatus {
   [key: string]: boolean
 }
 
+const codeExamples = {
+  javascript: {
+    name: "JavaScript",
+    icon: "🟨",
+    getCode: (publicKey: string, secretKey: string) => `const response = await fetch('/api/v1/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    public_key: "${publicKey}",
+    secret_key: "${secretKey}",
+    username: "player1",
+    password: "secure123",
+    hwid: "unique-hardware-id"
+  })
+});
+
+const data = await response.json();
+console.log(data);`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  python: {
+    name: "Python",
+    icon: "🐍",
+    getCode: (publicKey: string, secretKey: string) => `import requests
+import json
+
+# Authentication request
+response = requests.post('/api/v1/login', json={
+    "public_key": "${publicKey}",
+    "secret_key": "${secretKey}",
+    "username": "player1",
+    "password": "secure123",
+    "hwid": "unique-hardware-id"
+})
+
+data = response.json()
+print(json.dumps(data, indent=2))`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  php: {
+    name: "PHP",
+    icon: "🐘",
+    getCode: (publicKey: string, secretKey: string) => `<?php
+$data = array(
+    'public_key' => '${publicKey}',
+    'secret_key' => '${secretKey}',
+    'username' => 'player1',
+    'password' => 'secure123',
+    'hwid' => 'unique-hardware-id'
+);
+
+$options = array(
+    'http' => array(
+        'header' => "Content-type: application/json\\r\\n",
+        'method' => 'POST',
+        'content' => json_encode($data)
+    )
+);
+
+$context = stream_context_create($options);
+$result = file_get_contents('/api/v1/login', false, $context);
+$response = json_decode($result, true);
+
+print_r($response);
+?>`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  csharp: {
+    name: "C#",
+    icon: "💜",
+    getCode: (publicKey: string, secretKey: string) => `using System;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+
+var client = new HttpClient();
+var data = new {
+    public_key = "${publicKey}",
+    secret_key = "${secretKey}",
+    username = "player1",
+    password = "secure123",
+    hwid = "unique-hardware-id"
+};
+
+var json = JsonSerializer.Serialize(data);
+var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+var response = await client.PostAsync("/api/v1/login", content);
+var result = await response.Content.ReadAsStringAsync();
+
+Console.WriteLine(result);`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  go: {
+    name: "Go",
+    icon: "🐹",
+    getCode: (publicKey: string, secretKey: string) => `package main
+
+import "bytes"
+import "encoding/json"
+import "fmt"
+import "net/http"
+
+func main() {
+    data := map[string]string{
+        "public_key": "${publicKey}",
+        "secret_key": "${secretKey}",
+        "username": "player1",
+        "password": "secure123",
+        "hwid": "unique-hardware-id",
+    }
+    
+    jsonData, _ := json.Marshal(data)
+    resp, err := http.Post("/api/v1/login",
+    "application/json", bytes.NewBuffer(jsonData))
+    
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+    
+    fmt.Println("Response received")
+}`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  java: {
+    name: "Java",
+    icon: "☕",
+    getCode: (publicKey: string, secretKey: string) => `import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+
+public class ChessAuthExample {
+    public static void main(String[] args) throws Exception {
+        String json = """
+        {
+            "public_key": "${publicKey}",
+            "secret_key": "${secretKey}",
+            "username": "player1",
+            "password": "secure123",
+            "hwid": "unique-hardware-id"
+        }
+        """;
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("/api/v1/login"))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(json))
+            .build();
+
+        HttpResponse<String> response = client.send(request,
+            HttpResponse.BodyHandlers.ofString());
+        System.out.println(response.body());
+    }
+}`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  ruby: {
+    name: "Ruby",
+    icon: "💎",
+    getCode: (publicKey: string, secretKey: string) => `require 'net/http'
+require 'json'
+
+uri = URI('/api/v1/login')
+http = Net::HTTP.new(uri.host, uri.port)
+
+data = {
+    public_key: "${publicKey}",
+    secret_key: "${secretKey}",
+    username: "player1",
+    password: "secure123",
+    hwid: "unique-hardware-id"
+}
+
+request = Net::HTTP::Post.new(uri)
+request['Content-Type'] = 'application/json'
+request.body = data.to_json
+
+response = http.request(request)
+result = JSON.parse(response.body)
+puts JSON.pretty_generate(result)`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  rust: {
+    name: "Rust",
+    icon: "🦀",
+    getCode: (publicKey: string, secretKey: string) => `use reqwest;
+use serde_json::json;
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut data = HashMap::new();
+    data.insert("public_key", "${publicKey}");
+    data.insert("secret_key", "${secretKey}");
+    data.insert("username", "player1");
+    data.insert("password", "secure123");
+    data.insert("hwid", "unique-hardware-id");
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post("/api/v1/login")
+        .json(&data)
+        .send()
+        .await?;
+
+    let result: serde_json::Value = response.json().await?;
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    
+    Ok(())
+}`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+  curl: {
+    name: "cURL",
+    icon: "🌐",
+    getCode: (publicKey: string, secretKey: string) => `curl -X POST /api/v1/login \\
+  -H "Content-Type: application/json" \\
+  -H "User-Agent: ChessAuth-Client/1.0" \\
+  -d '{
+    "public_key": "${publicKey}",
+    "secret_key": "${secretKey}",
+    "username": "player1",
+    "password": "secure123",
+    "hwid": "unique-hardware-id"
+  }' \\
+  --silent \\
+  --show-error \\
+  | jq '.'`,
+    response: `{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "username": "player1",
+    "subscription": "pro",
+    "expires_at": "2024-12-31"
+  }
+}`,
+  },
+}
+
+function SyntaxHighlighter({ code, language }: { code: string; language: string }) {
+  const lines = code.split("\n")
+
+  const getTokenColor = (token: string, lang: string): string => {
+    const keywords = {
+      javascript: [
+        "const",
+        "let",
+        "var",
+        "function",
+        "async",
+        "await",
+        "import",
+        "export",
+        "return",
+        "if",
+        "else",
+        "for",
+        "while",
+        "try",
+        "catch",
+      ],
+      python: [
+        "import",
+        "def",
+        "class",
+        "if",
+        "else",
+        "elif",
+        "for",
+        "while",
+        "return",
+        "print",
+        "async",
+        "await",
+        "from",
+        "as",
+      ],
+      php: ["function", "class", "if", "else", "foreach", "return", "echo", "array", "new"],
+      csharp: ["using", "var", "public", "private", "class", "static", "async", "await", "new", "if", "else", "return"],
+      go: ["package", "import", "func", "var", "if", "else", "for", "return", "defer"],
+      java: ["public", "private", "class", "static", "import", "new", "if", "else", "return", "String", "void"],
+      ruby: ["require", "def", "class", "if", "else", "elsif", "end", "puts", "return"],
+      rust: ["use", "fn", "let", "mut", "if", "else", "match", "async", "await", "pub", "struct", "impl"],
+      curl: ["curl"],
+    }
+
+    const langKeywords = keywords[lang as keyof typeof keywords] || []
+    if (langKeywords.includes(token)) {
+      return "text-purple-400"
+    }
+
+    if (
+      (token.startsWith('"') && token.endsWith('"')) ||
+      (token.startsWith("'") && token.endsWith("'")) ||
+      (token.startsWith("`") && token.endsWith("`"))
+    ) {
+      return "text-green-300"
+    }
+
+    if (/^\d+\.?\d*$/.test(token)) {
+      return "text-orange-400"
+    }
+
+    if (token.startsWith("//") || token.startsWith("#")) {
+      return "text-gray-500"
+    }
+
+    if (lang === "json" && token.startsWith('"') && token.endsWith('":')) {
+      return "text-blue-300"
+    }
+
+    return "text-gray-300"
+  }
+
+  const tokenizeLine = (line: string, lang: string) => {
+    const tokens = line.split(/(\s+|[{}()[\],.;:=<>!&|+\-*/])/).filter((token) => token.length > 0)
+    return tokens.map((token, index) => {
+      const color = getTokenColor(token.trim(), lang)
+      return (
+        <span key={index} className={color}>
+          {token}
+        </span>
+      )
+    })
+  }
+
+  return (
+    <pre className="font-mono text-sm leading-6 whitespace-pre overflow-x-auto">
+      <code>
+        {lines.map((line, index) => (
+          <div key={index}>{line.trim() === "" ? "\u00A0" : tokenizeLine(line, language)}</div>
+        ))}
+      </code>
+    </pre>
+  )
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<{ id: number; username: string; email: string; role: string } | null>(null)
   const [applications, setApplications] = useState<Application[]>([])
@@ -98,6 +507,8 @@ export default function DashboardPage() {
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [hwidToggleLoading, setHwidToggleLoading] = useState<LoadingStates>({})
   const [copyStatus, setCopyStatus] = useState<CopyStatus>({})
+  const [selectedLanguage, setSelectedLanguage] = useState<keyof typeof codeExamples>("javascript")
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null)
 
   const router = useRouter()
 
@@ -107,7 +518,6 @@ export default function DashboardPage() {
       router.push("/login")
       return
     }
-
     try {
       const response = await fetch("/api/auth/me", {
         headers: { Authorization: `Bearer ${token}` },
@@ -137,13 +547,17 @@ export default function DashboardPage() {
       if (response.ok) {
         const data: ApplicationsResponse = await response.json()
         setApplications(data.applications)
+        // Set the first app as selected by default
+        if (data.applications.length > 0 && !selectedApp) {
+          setSelectedApp(data.applications[0])
+        }
       }
     } catch {
       console.error("Failed to fetch applications")
     } finally {
       setApplicationsLoading(false)
     }
-  }, [])
+  }, [selectedApp])
 
   useEffect(() => {
     checkAuth()
@@ -241,6 +655,7 @@ export default function DashboardPage() {
           newPassword: passwordData.newPassword,
         }),
       })
+
       const data: ApiResponse = await response.json()
       if (data.success) {
         setSettingsSuccess("Password changed successfully!")
@@ -262,7 +677,6 @@ export default function DashboardPage() {
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text)
     setCopyStatus((prev) => ({ ...prev, [key]: true }))
-
     setTimeout(() => {
       setCopyStatus((prev) => ({ ...prev, [key]: false }))
     }, 3000)
@@ -515,7 +929,7 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold flex-1 sm:flex-none"
+                className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold flex-1 sm:flex-none transition-all duration-300 ease-in-out transform hover:scale-105"
                 disabled={createAppLoading}
               >
                 {createAppLoading ? (
@@ -534,7 +948,7 @@ export default function DashboardPage() {
               {user?.role === "admin" && (
                 <Link href="/dashboard/admin" className="flex-1 sm:flex-none">
                   <Button
-                    className="w-full min-w-[140px] bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold"
+                    className="w-full min-w-[140px] bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold transition-all duration-300 ease-in-out transform hover:scale-105"
                     onClick={handleButtonClick}
                   >
                     <Shield className="h-4 w-4 mr-2" />
@@ -743,6 +1157,186 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* API Integration Section */}
+        {applications.length > 0 && (
+          <div className="space-y-6">
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold gradient-text flex items-center justify-center">
+                <Code className="h-6 w-6 mr-2" />
+                API Integration
+              </h2>
+              <p className="text-gray-400">Use your application keys to integrate ChessAuth into your projects</p>
+            </div>
+
+            {/* App Selector */}
+            <div className="flex justify-center">
+              <div className="flex flex-wrap gap-2 p-3 bg-black/30 rounded-xl border border-yellow-500/20 backdrop-blur-sm max-w-4xl">
+                {applications.map((app) => (
+                  <Button
+                    key={app.id}
+                    variant={selectedApp?.id === app.id ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setSelectedApp(app)}
+                    className={`${
+                      selectedApp?.id === app.id
+                        ? "bg-gradient-to-r from-yellow-500 to-yellow-600 text-black font-semibold"
+                        : "text-gray-300 hover:text-white hover:bg-gray-800"
+                    } transition-all duration-200 flex items-center gap-2`}
+                  >
+                    <Crown className="h-4 w-4" />
+                    <span className="hidden sm:inline">{app.app_name}</span>
+                    <span className="sm:hidden">{app.app_name.slice(0, 8)}...</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Language Selector */}
+            <div className="flex justify-center">
+              <div className="flex flex-nowrap gap-2 p-3 bg-black/30 rounded-xl border border-yellow-500/20 backdrop-blur-sm max-w-4xl">
+                {Object.entries(codeExamples).map(([key, lang]) => (
+                  <Button
+                    key={key}
+                    variant={selectedLanguage === key ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setSelectedLanguage(key as keyof typeof codeExamples)}
+                    className={`${
+                      selectedLanguage === key
+                        ? "bg-gradient-to-r from-yellow-500 to-yellow-600 text-black font-semibold"
+                        : "text-gray-300 hover:text-white hover:bg-gray-800"
+                    } transition-all duration-200 flex items-center gap-2`}
+                  >
+                    <span className="text-sm">{lang.icon}</span>
+                    <span className="hidden sm:inline">{lang.name}</span>
+                    <span className="sm:hidden">{lang.name.slice(0, 3)}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {selectedApp && (
+              <ModernCard className="max-w-7xl mx-auto overflow-hidden border border-yellow-500/20">
+                <CardContent className="p-0">
+                  <div className="grid grid-cols-1 lg:grid-cols-2">
+                    {/* Request Side */}
+                    <div className="relative">
+                      {/* Editor Header */}
+                      <div className="flex items-center justify-between px-6 py-3 bg-gray-900/50 border-b border-gray-700/50">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex space-x-1">
+                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Play className="h-4 w-4 text-yellow-500" />
+                            <span className="text-sm font-medium text-yellow-500">
+                              {codeExamples[selectedLanguage].name} Request
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            copyToClipboard(
+                              codeExamples[selectedLanguage].getCode(selectedApp.public_key, selectedApp.secret_key),
+                              `api-request-${selectedLanguage}-${selectedApp.id}`,
+                            )
+                          }
+                          className={`transition-all duration-200 ${
+                            copyStatus[`api-request-${selectedLanguage}-${selectedApp.id}`]
+                              ? "text-green-400 hover:text-green-300"
+                              : "text-gray-400 hover:text-white"
+                          }`}
+                        >
+                          {copyStatus[`api-request-${selectedLanguage}-${selectedApp.id}`] ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {/* Code Content */}
+                      <div className="relative">
+                        <div className="bg-gray-900/20 p-6 text-sm overflow-x-auto min-h-[400px]">
+                          <SyntaxHighlighter
+                            code={codeExamples[selectedLanguage].getCode(
+                              selectedApp.public_key,
+                              selectedApp.secret_key,
+                            )}
+                            language={selectedLanguage}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Response Side */}
+                    <div className="relative border-l border-gray-700/50">
+                      {/* Editor Header */}
+                      <div className="flex items-center justify-between px-6 py-3 bg-gray-900/50 border-b border-gray-700/50">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex space-x-1">
+                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Database className="h-4 w-4 text-blue-400" />
+                            <span className="text-sm font-medium text-blue-400">JSON Response</span>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            copyToClipboard(
+                              codeExamples[selectedLanguage].response,
+                              `api-response-${selectedLanguage}-${selectedApp.id}`,
+                            )
+                          }
+                          className={`transition-all duration-200 ${
+                            copyStatus[`api-response-${selectedLanguage}-${selectedApp.id}`]
+                              ? "text-green-400 hover:text-green-300"
+                              : "text-gray-400 hover:text-white"
+                          }`}
+                        >
+                          {copyStatus[`api-response-${selectedLanguage}-${selectedApp.id}`] ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {/* Code Content */}
+                      <div className="relative">
+                        <div className="bg-gray-900/20 p-6 text-sm overflow-x-auto min-h-[400px]">
+                          <SyntaxHighlighter code={codeExamples[selectedLanguage].response} language="json" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Integration Note */}
+                  <div className="p-6 bg-gradient-to-r from-yellow-500/10 to-blue-500/10 border-t border-yellow-500/20">
+                    <div className="flex items-start space-x-3">
+                      <Crown className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <h4 className="text-yellow-500 font-semibold mb-1">Integration Ready</h4>
+                        <p className="text-gray-300 text-sm">
+                          Your API keys for <span className="font-semibold text-white">{selectedApp.app_name}</span> are
+                          already included in the code above. The HWID can be generated using our client libraries or
+                          your own hardware fingerprinting solution.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </ModernCard>
+            )}
+          </div>
+        )}
       </div>
     </ModernLayout>
   )
