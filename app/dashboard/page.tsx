@@ -289,30 +289,46 @@ public class ChessAuthExample {
   }
 }`,
   },
-  ruby: {
-    name: "Ruby",
-    icon: "💎",
-    getCode: (publicKey: string, secretKey: string) => `require 'net/http'
-require 'json'
+  cpp: {
+    name: "C++",
+    icon: "🔷",
+    getCode: (publicKey: string, secretKey: string) => `#include <iostream>
+#include <string>
+#include <cpprest/http_client.h>
+#include <cpprest/json.h>
 
-uri = URI('/api/v1/login')
-http = Net::HTTP.new(uri.host, uri.port)
+using namespace web;
+using namespace web::http;
+using namespace web::http::client;
 
-data = {
-    public_key: "${publicKey}",
-    secret_key: "${secretKey}",
-    username: "player1",
-    password: "secure123",
-    hwid: "unique-hardware-id"
-}
+int main() {
+    try {
+        http_client client(U("/api/v1/login"));
+        json::value data;
+        data[U("public_key")] = json::value::string(U("${publicKey}"));
+        data[U("secret_key")] = json::value::string(U("${secretKey}"));
+        data[U("username")] = json::value::string(U("player1"));
+        data[U("password")] = json::value::string(U("secure123"));
+        data[U("hwid")] = json::value::string(U("unique-hardware-id"));
 
-request = Net::HTTP::Post.new(uri)
-request['Content-Type'] = 'application/json'
-request.body = data.to_json
+        http_request request(methods::POST);
+        request.headers().set_content_type(U("application/json"));
+        request.set_body(data);
 
-response = http.request(request)
-result = JSON.parse(response.body)
-puts JSON.pretty_generate(result)`,
+        client.request(request).then([](http_response response) {
+            if (response.status_code() == status_codes::OK) {
+                return response.extract_json();
+            }
+            return pplx::task_from_result(json::value());
+        }).then([](json::value body) {
+            std::wcout << body.serialize() << std::endl;
+        }).wait();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
+    return 0;
+}`,
     response: `{
   "success": true,
   "message": "Login successful",
@@ -405,7 +421,7 @@ function SyntaxHighlighter({ code, language }: { code: string; language: string 
       csharp: ["using", "var", "public", "private", "class", "static", "async", "await", "new", "if", "else", "return"],
       go: ["package", "import", "func", "var", "if", "else", "for", "return", "defer"],
       java: ["public", "private", "class", "static", "import", "new", "if", "else", "return", "String", "void"],
-      ruby: ["require", "def", "class", "if", "else", "elsif", "end", "puts", "return"],
+      cpp: ["include", "using", "namespace", "int", "try", "catch", "return", "std", "cout", "cerr"],
       rust: ["use", "fn", "let", "mut", "if", "else", "match", "async", "await", "pub", "struct", "impl"],
     }
 
